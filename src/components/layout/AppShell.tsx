@@ -58,6 +58,7 @@ export function AppShell() {
 
   return (
     <TooltipProvider>
+      <div className="noise-overlay" />
       <div className="min-h-dvh overflow-hidden bg-background text-foreground">
         <div className="app-backdrop fixed inset-0 -z-10" />
         <header className="flex h-16 items-center justify-between border-b border-border/70 bg-background/88 px-3 backdrop-blur-xl sm:px-5">

@@ -96,11 +96,25 @@ export const useSimulationStore = create<SimulationState>()(
     }),
     {
       name: PREFERENCES_STORAGE_KEY,
+      version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         config: state.config,
         controlPanelOpen: state.controlPanelOpen,
       }),
+      migrate: (persisted, version) => {
+        const stored = persisted as Partial<SimulationState> | undefined
+        if (version < 1 && stored?.config?.camera) {
+          return {
+            ...stored,
+            config: {
+              ...stored.config,
+              camera: { ...stored.config.camera, cinematic: false },
+            },
+          }
+        }
+        return persisted
+      },
       merge: (persisted, current) => {
         const stored = persisted as Partial<SimulationState> | undefined
         return {

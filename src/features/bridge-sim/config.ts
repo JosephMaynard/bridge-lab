@@ -62,7 +62,7 @@ export const defaultConfig: SimulationConfig = {
     timeOfDay: "golden",
   },
   camera: {
-    cinematic: true,
+    cinematic: false,
     autoOrbitSpeed: 0.14,
     distance: 48,
     heightBias: 13,
