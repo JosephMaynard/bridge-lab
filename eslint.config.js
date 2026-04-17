@@ -20,4 +20,17 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    files: ['src/features/bridge-sim/scene/**/*.{ts,tsx}'],
+    rules: {
+      'react-hooks/refs': 'off',
+      'react-hooks/immutability': 'off',
+    },
+  },
 ])
