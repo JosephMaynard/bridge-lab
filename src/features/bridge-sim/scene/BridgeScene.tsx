@@ -18,6 +18,9 @@ const stressColor = (stress: number, threshold: number) => {
   return "#ff2f5f"
 }
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
+
 const seededParticle = (index: number, salt: number) => {
   const value = Math.sin((index + 1) * salt) * 43758.5453
   return value - Math.floor(value)
@@ -116,11 +119,16 @@ function DeckSegment({
   end,
   width,
   color,
+  fracture,
 }: {
   start: BridgeNodeFrame
   end: BridgeNodeFrame
   width: number
   color: string
+  fracture?: {
+    offset: [number, number, number]
+    rotation: [number, number, number]
+  }
 }) {
   const dx = end.x - start.x
   const dy = end.y - start.y
@@ -133,8 +141,16 @@ function DeckSegment({
     <mesh
       castShadow
       receiveShadow
-      position={[(start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2]}
-      rotation={[0, yaw, pitch]}
+      position={[
+        (start.x + end.x) / 2 + (fracture?.offset[0] ?? 0),
+        (start.y + end.y) / 2 + (fracture?.offset[1] ?? 0),
+        (start.z + end.z) / 2 + (fracture?.offset[2] ?? 0),
+      ]}
+      rotation={[
+        fracture?.rotation[0] ?? 0,
+        yaw + (fracture?.rotation[1] ?? 0),
+        pitch + (fracture?.rotation[2] ?? 0),
+      ]}
     >
       <boxGeometry args={[length + 0.04, 0.28, width]} />
       <meshStandardMaterial color={color} metalness={0.48} roughness={0.36} emissive={color} emissiveIntensity={0.06} />
@@ -171,6 +187,37 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
   const towerX = config.bridge.spanLength * 0.32
   const railLeft = nodes.map((node) => nodeTuple(node, 0.54, -config.bridge.deckWidth / 2 - 0.18))
   const railRight = nodes.map((node) => nodeTuple(node, 0.54, config.bridge.deckWidth / 2 + 0.18))
+  const failureProgress =
+    frame.failureTime === undefined
+      ? 0
+      : clamp(frame.isStanding ? (frame.time - frame.failureTime) / 3.1 : Math.max(0.42, (frame.time - frame.failureTime) / 3.1), 0, 1)
+  const fractureFade = failureProgress > 0 ? clamp(1 - failureProgress * 1.35, 0, 1) : 1
+  const criticalSegment = clamp(frame.failureNodeIndex ?? Math.floor(nodes.length / 2), 0, nodes.length - 2)
+  const fragmentForSegment = (index: number) => {
+    if (failureProgress <= 0) return undefined
+
+    const distance = Math.abs(index - criticalSegment)
+    const influence = clamp(1 - distance / 14, 0.08, 1)
+    const side = index < criticalSegment ? -1 : 1
+    const launch = 1 - Math.pow(1 - failureProgress, 3)
+    const seed = seededParticle(index, 44.7) - 0.5
+    const cross = seededParticle(index, 91.2) - 0.5
+    const upwardKick = Math.sin(failureProgress * Math.PI) * 2.8 * influence
+    const fall = Math.pow(failureProgress, 1.4) * (1.2 + influence * 2.1)
+
+    return {
+      offset: [
+        side * launch * influence * (2.4 + distance * 0.24),
+        upwardKick - fall,
+        launch * influence * (side * 7.2 + cross * 8.4),
+      ] as [number, number, number],
+      rotation: [
+        launch * influence * (1.1 + seed * 2.4),
+        launch * influence * side * (0.32 + distance * 0.055),
+        launch * influence * side * (0.9 + seed * 1.4),
+      ] as [number, number, number],
+    }
+  }
   const cableY = (node: BridgeNodeFrame) => {
     const shape = Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5))
     return config.bridge.towerHeight + 0.4 - shape * config.bridge.towerHeight * config.bridge.cableSag
@@ -185,17 +232,18 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
           end={nodes[index + 1]}
           width={config.bridge.deckWidth}
           color={stressColor(frame.segmentStress[index] ?? node.stress, threshold)}
+          fracture={fragmentForSegment(index)}
         />
       ))}
-      <Line points={railLeft} color="#dce9df" lineWidth={1.4} transparent opacity={0.92} />
-      <Line points={railRight} color="#dce9df" lineWidth={1.4} transparent opacity={0.92} />
+      <Line points={railLeft} color="#dce9df" lineWidth={1.4} transparent opacity={0.92 * fractureFade} />
+      <Line points={railRight} color="#dce9df" lineWidth={1.4} transparent opacity={0.92 * fractureFade} />
       {config.bridge.type === "suspension" && (
         <>
           <Tower x={-towerX} height={config.bridge.towerHeight} width={config.bridge.deckWidth} stress={frame.maxStress} />
           <Tower x={towerX} height={config.bridge.towerHeight} width={config.bridge.deckWidth} stress={frame.maxStress} />
-          <Line points={nodes.map((node) => [node.x, cableY(node), node.z] as [number, number, number])} color="#f3e9bd" lineWidth={2.2} />
+          <Line points={nodes.map((node) => [node.x, cableY(node), node.z] as [number, number, number])} color="#f3e9bd" lineWidth={2.2} transparent opacity={fractureFade} />
           {nodes.filter((_, index) => index % 2 === 0).map((node) => (
-            <Line key={`hanger-${node.id}`} points={[[node.x, node.y + 0.22, node.z], [node.x, cableY(node), node.z]]} color="#b7c9c2" lineWidth={0.7} transparent opacity={0.72} />
+            <Line key={`hanger-${node.id}`} points={[[node.x, node.y + 0.22, node.z], [node.x, cableY(node), node.z]]} color="#b7c9c2" lineWidth={0.7} transparent opacity={0.72 * fractureFade} />
           ))}
         </>
       )}
@@ -208,18 +256,20 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
             })}
             color="#f0d27a"
             lineWidth={4}
+            transparent
+            opacity={fractureFade}
           />
           {nodes.filter((_, index) => index % 3 === 0).map((node) => (
-            <Line key={`arch-post-${node.id}`} points={[[node.x, node.y - 0.25, node.z], [node.x, node.y - 2.9 + Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5)) * config.bridge.towerHeight * 0.72, node.z]]} color="#d4e1d8" lineWidth={0.9} />
+            <Line key={`arch-post-${node.id}`} points={[[node.x, node.y - 0.25, node.z], [node.x, node.y - 2.9 + Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5)) * config.bridge.towerHeight * 0.72, node.z]]} color="#d4e1d8" lineWidth={0.9} transparent opacity={fractureFade} />
           ))}
         </>
       )}
       {config.bridge.type === "truss" && (
         <>
           {nodes.slice(0, -2).map((node, index) => (
-            <Line key={`truss-${node.id}`} points={[nodeTuple(node, 0.42, -config.bridge.deckWidth / 2), nodeTuple(nodes[index + 2], 1.8, config.bridge.deckWidth / 2)]} color={index % 2 === 0 ? "#e8d26a" : "#a7ded3"} lineWidth={1.2} transparent opacity={0.8} />
+            <Line key={`truss-${node.id}`} points={[nodeTuple(node, 0.42, -config.bridge.deckWidth / 2), nodeTuple(nodes[index + 2], 1.8, config.bridge.deckWidth / 2)]} color={index % 2 === 0 ? "#e8d26a" : "#a7ded3"} lineWidth={1.2} transparent opacity={0.8 * fractureFade} />
           ))}
-          <Line points={nodes.map((node) => nodeTuple(node, 1.85, 0))} color="#d8e8df" lineWidth={1.6} />
+          <Line points={nodes.map((node) => nodeTuple(node, 1.85, 0))} color="#d8e8df" lineWidth={1.6} transparent opacity={fractureFade} />
         </>
       )}
       {Array.from({ length: config.bridge.supports }).map((_, index) => {
