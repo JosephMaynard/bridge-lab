@@ -386,6 +386,7 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
   const towerX = config.bridge.spanLength * 0.32
   const railLeft = nodes.map((node) => nodeTuple(node, 0.54, -config.bridge.deckWidth / 2 - 0.18))
   const railRight = nodes.map((node) => nodeTuple(node, 0.54, config.bridge.deckWidth / 2 + 0.18))
+  const suspensionCableSides = [-1, 1] as const
   const failureProgress =
     frame.failureTime === undefined
       ? 0
@@ -440,10 +441,24 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
         <>
           <Tower x={-towerX} height={config.bridge.towerHeight} width={config.bridge.deckWidth} stress={frame.maxStress} />
           <Tower x={towerX} height={config.bridge.towerHeight} width={config.bridge.deckWidth} stress={frame.maxStress} />
-          <Line points={nodes.map((node) => [node.x, cableY(node), node.z] as [number, number, number])} color="#f3e9bd" lineWidth={2.2} transparent opacity={fractureFade} />
-          {nodes.filter((_, index) => index % 2 === 0).map((node) => (
-            <Line key={`hanger-${node.id}`} points={[[node.x, node.y + 0.22, node.z], [node.x, cableY(node), node.z]]} color="#b7c9c2" lineWidth={0.7} transparent opacity={0.72 * fractureFade} />
-          ))}
+          {suspensionCableSides.map((side) => {
+            const cableZ = side * (config.bridge.deckWidth / 2 + 0.2)
+            return (
+              <group key={`suspension-side-${side}`}>
+                <Line points={nodes.map((node) => [node.x, cableY(node), cableZ] as [number, number, number])} color="#f3e9bd" lineWidth={2.2} transparent opacity={fractureFade} />
+                {nodes.filter((_, index) => index % 2 === 0).map((node) => (
+                  <Line
+                    key={`hanger-${side}-${node.id}`}
+                    points={[[node.x, node.y + 0.24, cableZ], [node.x, cableY(node), cableZ]]}
+                    color="#cfe0da"
+                    lineWidth={0.78}
+                    transparent
+                    opacity={0.78 * fractureFade}
+                  />
+                ))}
+              </group>
+            )
+          })}
         </>
       )}
       {config.bridge.type === "arch" && (
