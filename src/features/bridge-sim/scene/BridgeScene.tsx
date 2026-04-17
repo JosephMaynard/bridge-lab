@@ -278,11 +278,10 @@ function IdleBridge({ config }: { config: SimulationConfig }) {
 
 function WindParticles({ config, frame }: { config: SimulationConfig; frame?: SimulationFrame }) {
   const pointsRef = useRef<THREE.Points>(null)
-  const positionsRef = useRef(new Float32Array(0))
+  const trailsRef = useRef<THREE.LineSegments>(null)
   const count = Math.min(1600, Math.max(0, config.wind.particleCount))
-  if (positionsRef.current.length !== count * 3) {
-    positionsRef.current = new Float32Array(count * 3)
-  }
+  const positions = useMemo(() => new Float32Array(count * 3), [count])
+  const trailPositions = useMemo(() => new Float32Array(count * 6), [count])
   const seeds = useMemo(
     () =>
       Array.from({ length: count }, (_, index) => [
@@ -295,30 +294,60 @@ function WindParticles({ config, frame }: { config: SimulationConfig; frame?: Si
   )
 
   useFrame(({ clock }) => {
-    if (!pointsRef.current || !config.wind.enabled || !config.wind.showParticles) return
-    const speed = (frame?.windSpeed ?? config.wind.speed) * 0.012 * config.wind.particleSpeed
-    const direction = (config.wind.direction * Math.PI) / 180
-    const positions = positionsRef.current
+    if (!pointsRef.current || !trailsRef.current || !config.wind.enabled || !config.wind.showParticles) return
+    const speed = (frame?.windSpeed ?? config.wind.speed) * 0.01 * config.wind.particleSpeed
+    const angle = (config.wind.direction * Math.PI) / 180
+    const alongX = Math.cos(angle)
+    const alongZ = Math.sin(angle)
+    const crossX = -alongZ
+    const crossZ = alongX
+    const fieldLength = 72
+    const fieldWidth = 34
+    const trailLength = 1.8 + config.wind.particleTrail * 8.5 + speed * 1.4
     for (let index = 0; index < count; index += 1) {
       const seed = seeds[index]
       const travel = (seed[0] + clock.elapsedTime * speed + seed[3] * 0.2) % 1
-      positions[index * 3] = -31 + travel * 62
-      positions[index * 3 + 1] = -1.5 + seed[1] * 13 + Math.sin(clock.elapsedTime * 1.7 + index) * config.wind.turbulence * 0.18
-      positions[index * 3 + 2] = (seed[2] - 0.5) * 26 + Math.sin(direction) * travel * 10
+      const along = (travel - 0.5) * fieldLength
+      const cross = (seed[2] - 0.5) * fieldWidth
+      const turbulence =
+        Math.sin(clock.elapsedTime * 1.7 + index * 0.37) * config.wind.turbulence * 1.4 +
+        Math.cos(clock.elapsedTime * 0.9 + index * 0.19) * config.wind.gustiness * 0.7
+      const x = alongX * along + crossX * cross + crossX * turbulence
+      const y = -1.5 + seed[1] * 13 + Math.sin(clock.elapsedTime * 1.7 + index) * config.wind.turbulence * 0.36
+      const z = alongZ * along + crossZ * cross + crossZ * turbulence
+      const base = index * 3
+      positions[base] = x
+      positions[base + 1] = y
+      positions[base + 2] = z
+      const trailBase = index * 6
+      trailPositions[trailBase] = x
+      trailPositions[trailBase + 1] = y
+      trailPositions[trailBase + 2] = z
+      trailPositions[trailBase + 3] = x - alongX * trailLength
+      trailPositions[trailBase + 4] = y - turbulence * 0.06
+      trailPositions[trailBase + 5] = z - alongZ * trailLength
     }
-    const attribute = pointsRef.current.geometry.getAttribute("position") as THREE.BufferAttribute
-    attribute.needsUpdate = true
+    ;(pointsRef.current.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true
+    ;(trailsRef.current.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true
   })
 
   if (!config.wind.enabled || !config.wind.showParticles || count === 0) return null
 
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positionsRef.current, 3]} />
-      </bufferGeometry>
-      <pointsMaterial color="#c9fff1" size={config.wind.particleSize} transparent opacity={0.36 + config.wind.particleTrail * 0.32} depthWrite={false} />
-    </points>
+    <group>
+      <lineSegments ref={trailsRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[trailPositions, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#c9fff1" transparent opacity={0.12 + config.wind.particleTrail * 0.46} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </lineSegments>
+      <points ref={pointsRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
+        <pointsMaterial color="#e6fff8" size={config.wind.particleSize} transparent opacity={0.6 + config.wind.particleTrail * 0.22} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </points>
+    </group>
   )
 }
 

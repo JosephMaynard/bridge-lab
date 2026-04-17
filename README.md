@@ -44,6 +44,8 @@ Each frame stores:
 
 Stress is driven by load profile, wind gusts, earthquake waveform, bridge stiffness, damping, material strength, and bridge type. When max stress or accumulated damage crosses the configured threshold, the engine records a failure time and critical node. Later frames keep replaying the collapse deformation in the Three.js layer.
 
+Wind particles are a visualization of the same wind field used by the simulation: speed, gustiness, direction, and turbulence. They are not individual solver particles and do not add per-particle impact forces. The simulation reads the wind controls directly, while the renderer uses those same controls to draw directional particle heads and trail lines.
+
 ## R3F and VTK overlay synchronisation
 
 React Three Fiber owns the main cinematic scene: bridge geometry, landmasses, water, particles, camera motion, manual orbit controls, and collapse animation.

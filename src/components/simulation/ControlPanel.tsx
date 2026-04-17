@@ -131,9 +131,12 @@ export function ControlPanel() {
               <Separator />
               <SwitchRow label="Show particles" checked={config.wind.showParticles} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, wind: { ...draft.wind, showParticles: checked } }))} />
               <SliderRow label="Particle count" value={config.wind.particleCount} min={0} max={1600} step={20} onChange={(value) => updateConfig((draft) => ({ ...draft, wind: { ...draft.wind, particleCount: value } }))} />
-              <SliderRow label="Particle size" value={config.wind.particleSize} min={0.01} max={0.09} step={0.005} onChange={(value) => updateConfig((draft) => ({ ...draft, wind: { ...draft.wind, particleSize: value } }))} />
+              <SliderRow label="Particle size" value={config.wind.particleSize} min={0.05} max={0.28} step={0.005} onChange={(value) => updateConfig((draft) => ({ ...draft, wind: { ...draft.wind, particleSize: value } }))} />
               <SliderRow label="Speed multiplier" value={config.wind.particleSpeed} min={0.25} max={2.4} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, wind: { ...draft.wind, particleSpeed: value } }))} />
               <SliderRow label="Trail persistence" value={config.wind.particleTrail} min={0.1} max={1} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, wind: { ...draft.wind, particleTrail: value } }))} />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Particles visualize the same wind speed, gust, direction, and turbulence used by the simulation. Individual particles do not apply separate forces.
+              </p>
             </AccordionContent>
           </AccordionItem>
 

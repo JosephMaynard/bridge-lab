@@ -34,7 +34,7 @@ export const defaultConfig: SimulationConfig = {
     direction: -18,
     turbulence: 0.42,
     particleCount: 520,
-    particleSize: 0.035,
+    particleSize: 0.08,
     particleSpeed: 1.25,
     particleTrail: 0.55,
     showParticles: true,

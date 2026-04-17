@@ -65,7 +65,6 @@ export function AppShell() {
             <img src={logoUrl} alt="BridgeLab logo" className="size-10 rounded-md shadow-lg" />
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold tracking-tight">BridgeLab</h1>
-              <p className="hidden text-xs text-muted-foreground sm:block">Interactive structural replay and stress visualisation</p>
             </div>
             <Badge variant="secondary" className="hidden rounded-sm md:inline-flex">{bridgeTypeLabels[config.bridge.type]}</Badge>
             <Badge className={frame && !frame.isStanding ? "hidden rounded-sm bg-red-500/90 text-white md:inline-flex" : "hidden rounded-sm bg-teal-500/90 text-[#08110f] md:inline-flex"}>
