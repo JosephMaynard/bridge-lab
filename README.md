@@ -46,6 +46,8 @@ Stress is driven by load profile, wind gusts, earthquake waveform, bridge stiffn
 
 Wind particles are a visualization of the same wind field used by the simulation: speed, gustiness, direction, and turbulence. They are not individual solver particles and do not add per-particle impact forces. The simulation reads the wind controls directly, while the renderer uses those same controls to draw directional particle heads and trail lines.
 
+Meteor impacts are simulation inputs and visual events. The engine applies a localized impact force around the configured target point using impact time, intensity, radius, speed, and entry angle. The renderer replays that same event with an incoming meteor, hot trail, impact flash, expanding shockwave, and deterministic fragment spray.
+
 ## R3F and VTK overlay synchronisation
 
 React Three Fiber owns the main cinematic scene: bridge geometry, landmasses, water, particles, camera motion, manual orbit controls, and collapse animation.
@@ -62,6 +64,7 @@ Adjust presets in `src/features/bridge-sim/config.ts`. The exported `presets` ar
 - Crosswind Stress Test
 - Earthquake Failure
 - Heavy Load
+- Meteor Strike
 - Extreme Chaos
 
 Add or tune controls by extending `SimulationConfig` in `src/types/simulation.ts`, updating defaults/presets in `config.ts`, and wiring UI bindings in `src/components/simulation/ControlPanel.tsx`.

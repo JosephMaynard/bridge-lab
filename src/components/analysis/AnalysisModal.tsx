@@ -23,6 +23,7 @@ const chartColors = {
   sway: "#40d4be",
   wind: "#75a7ff",
   quake: "#e58b4c",
+  impact: "#ff9f43",
   load: "#9fd95a",
 }
 
@@ -122,6 +123,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
             <TabsTrigger value="supports">Supports</TabsTrigger>
             <TabsTrigger value="wind">Wind</TabsTrigger>
             <TabsTrigger value="quake">Earthquake</TabsTrigger>
+            <TabsTrigger value="impact">Impact</TabsTrigger>
             <TabsTrigger value="load">Load</TabsTrigger>
             <TabsTrigger value="compare">Compare</TabsTrigger>
           </TabsList>
@@ -167,6 +169,15 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
                 { x: time, y: frames.map((frame) => frame.damage), type: "scatter", mode: "lines", name: "Accumulated damage", line: { color: chartColors.stress, width: 3 } },
               ]}
               layout={baseLayout("Earthquake intensity vs damage", currentTime)}
+            />
+          </TabsContent>
+          <TabsContent value="impact">
+            <PlotPanel
+              data={[
+                { x: time, y: frames.map((frame) => frame.impactForce), type: "scatter", mode: "lines", name: "Meteor impact force", line: { color: chartColors.impact, width: 3 } },
+                { x: time, y: frames.map((frame) => frame.damage), type: "scatter", mode: "lines", name: "Accumulated damage", line: { color: chartColors.stress, width: 3 } },
+              ]}
+              layout={baseLayout("Meteor impact force vs damage", currentTime)}
             />
           </TabsContent>
           <TabsContent value="load">

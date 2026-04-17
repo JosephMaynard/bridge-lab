@@ -319,6 +319,8 @@ function IdleBridge({ config }: { config: SimulationConfig }) {
     lateralSway: 0,
     windSpeed: config.wind.enabled ? config.wind.speed : 0,
     earthquakeForce: 0,
+    impactForce: 0,
+    impactX: config.impact.targetBias * config.bridge.spanLength * 0.48,
     loadProfile: nodes.map(() => 0.12),
     damage: 0,
   }
@@ -401,6 +403,129 @@ function WindParticles({ config, frame }: { config: SimulationConfig; frame?: Si
   )
 }
 
+function MeteorImpact({ config, frame }: { config: SimulationConfig; frame?: SimulationFrame }) {
+  const impact = config.impact
+  const data = useMemo(() => {
+    if (!frame || !impact.enabled || !impact.showEffects) return null
+
+    const localTime = frame.time - impact.impactTime
+    const approachDuration = clamp(3.8 - impact.speed / 70, 1.6, 3.2)
+    if (localTime < -approachDuration || localTime > 5.5) return null
+
+    const angle = (impact.angle * Math.PI) / 180
+    const impactPoint = new THREE.Vector3(frame.impactX, -0.1, 0)
+    const incomingOffset = new THREE.Vector3(-Math.cos(angle) * 28, 24, -Math.sin(angle) * 24)
+    const incomingStart = impactPoint.clone().add(incomingOffset)
+    const incomingProgress = clamp((localTime + approachDuration) / approachDuration, 0, 1)
+    const meteorPosition = incomingStart.clone().lerp(impactPoint, incomingProgress)
+    const tailEnd = meteorPosition.clone().add(incomingOffset.clone().normalize().multiplyScalar(8 + impact.speed * 0.12))
+    const blastProgress = clamp(localTime / 4.2, 0, 1)
+    const flash = localTime >= 0 && localTime < 0.85 ? 1 - localTime / 0.85 : 0
+    const fragmentCount = localTime >= 0 ? Math.min(420, Math.max(24, Math.round(impact.fragmentCount))) : 0
+    const debris = new Float32Array(fragmentCount * 3)
+    const streaks = new Float32Array(fragmentCount * 6)
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      const radial = seededParticle(index, 21.9) * Math.PI * 2
+      const spread = 3 + seededParticle(index, 73.1) * 18 * impact.radius + impact.intensity * 6.5
+      const lift = 3.8 + seededParticle(index, 11.6) * 10.5 * impact.intensity
+      const speed = blastProgress * (0.6 + seededParticle(index, 41.4) * 1.4)
+      const fall = Math.pow(blastProgress, 1.55) * (0.3 + seededParticle(index, 55.5) * 3.2)
+      const x = impactPoint.x + Math.cos(radial) * spread * speed
+      const y = impactPoint.y + lift * Math.sin(blastProgress * Math.PI) - fall
+      const z = impactPoint.z + Math.sin(radial) * spread * speed
+      const base = index * 3
+      debris[base] = x
+      debris[base + 1] = y
+      debris[base + 2] = z
+
+      const streakBase = index * 6
+      const trailLength = 1.2 + seededParticle(index, 9.4) * 4.2
+      streaks[streakBase] = x
+      streaks[streakBase + 1] = y
+      streaks[streakBase + 2] = z
+      streaks[streakBase + 3] = x - Math.cos(radial) * trailLength
+      streaks[streakBase + 4] = y - 0.4 - trailLength * 0.25
+      streaks[streakBase + 5] = z - Math.sin(radial) * trailLength
+    }
+
+    return {
+      localTime,
+      meteorPosition,
+      tailEnd,
+      impactPoint,
+      blastProgress,
+      flash,
+      debris,
+      streaks,
+    }
+  }, [
+    frame,
+    impact.angle,
+    impact.enabled,
+    impact.fragmentCount,
+    impact.impactTime,
+    impact.intensity,
+    impact.radius,
+    impact.showEffects,
+    impact.speed,
+  ])
+
+  if (!data) return null
+
+  const meteorVisible = data.localTime < 0
+  const shockVisible = data.localTime >= 0 && data.blastProgress < 1
+  const shockRadius = 1.8 + data.blastProgress * (15 + config.impact.radius * 24)
+  const shockOpacity = Math.max(0, 0.88 - data.blastProgress * 0.82)
+
+  return (
+    <group>
+      {meteorVisible && (
+        <>
+          <Line points={[data.meteorPosition.toArray(), data.tailEnd.toArray()]} color="#ff8a2d" lineWidth={11} transparent opacity={0.88} />
+          <Line points={[data.meteorPosition.toArray(), data.tailEnd.clone().add(new THREE.Vector3(0, 1.6, 0)).toArray()]} color="#fff0bd" lineWidth={2.4} transparent opacity={0.72} />
+          <mesh position={data.meteorPosition.toArray()} castShadow>
+            <icosahedronGeometry args={[0.55 + config.impact.radius * 1.5, 2]} />
+            <meshStandardMaterial color="#2a211f" emissive="#ff6a22" emissiveIntensity={2.8} roughness={0.7} />
+          </mesh>
+          <pointLight position={data.meteorPosition.toArray()} color="#ff7a2f" intensity={40 * config.impact.intensity} distance={26} />
+        </>
+      )}
+      {data.flash > 0 && (
+        <>
+          <mesh position={[data.impactPoint.x, data.impactPoint.y + 0.7, data.impactPoint.z]}>
+            <sphereGeometry args={[2 + config.impact.radius * 8, 32, 16]} />
+            <meshBasicMaterial color="#fff3b0" transparent opacity={data.flash * 0.62} blending={THREE.AdditiveBlending} />
+          </mesh>
+          <pointLight position={[data.impactPoint.x, data.impactPoint.y + 3, data.impactPoint.z]} color="#ffb43f" intensity={90 * data.flash * config.impact.intensity} distance={36} />
+        </>
+      )}
+      {shockVisible && (
+        <mesh position={[data.impactPoint.x, data.impactPoint.y + 0.42, data.impactPoint.z]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[shockRadius, 0.1 + config.impact.intensity * 0.08, 12, 128]} />
+          <meshBasicMaterial color="#ffdf72" transparent opacity={shockOpacity} blending={THREE.AdditiveBlending} />
+        </mesh>
+      )}
+      {data.debris.length > 0 && (
+        <>
+          <lineSegments>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[data.streaks, 3]} />
+            </bufferGeometry>
+            <lineBasicMaterial color="#ff9f35" transparent opacity={0.78} depthWrite={false} blending={THREE.AdditiveBlending} />
+          </lineSegments>
+          <points>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[data.debris, 3]} />
+            </bufferGeometry>
+            <pointsMaterial color="#ffe176" size={0.2 + config.impact.radius * 0.45} transparent opacity={0.92} depthWrite={false} blending={THREE.AdditiveBlending} />
+          </points>
+        </>
+      )}
+    </group>
+  )
+}
+
 function SceneContents() {
   const config = useSimulationStore((state) => state.config)
   const run = useSimulationStore((state) => state.currentRun)
@@ -413,6 +538,7 @@ function SceneContents() {
       <Atmosphere />
       <BridgeModel config={config} frame={frame} />
       <WindParticles config={config} frame={frame} />
+      <MeteorImpact config={config} frame={frame} />
       <CameraDirector config={config} frame={frame} />
       <OrbitControls enabled={!config.camera.cinematic} enableDamping dampingFactor={0.08} minDistance={20} maxDistance={90} maxPolarAngle={Math.PI * 0.49} />
     </>

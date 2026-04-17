@@ -78,6 +78,12 @@ const supportStressFor = (frameStress: number[], supports: number) => {
   return result
 }
 
+const impactPulseFor = (time: number, config: SimulationConfig) => {
+  if (!config.impact.enabled) return 0
+  const width = clamp(0.24 + config.impact.radius * 0.62 + 42 / Math.max(32, config.impact.speed) * 0.08, 0.18, 0.58)
+  return Math.exp(-Math.pow((time - config.impact.impactTime) / width, 2))
+}
+
 export const runSimulation = (config: SimulationConfig): SimulationRun => {
   const frameCount = Math.max(60, Math.round(config.timing.duration * config.timing.sampleDensity))
   const dt = config.timing.duration / (frameCount - 1)
@@ -108,6 +114,9 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     const quakeEnvelope = quakeActive ? Math.sin(Math.PI * clamp(time / config.earthquake.duration, 0, 1)) : 0
     const quakeWave = waveformValue(config.earthquake.waveform, time * config.earthquake.frequency * Math.PI * 2)
     const earthquakeForce = quakeActive ? config.earthquake.intensity * quakeEnvelope * quakeWave : 0
+    const impactPulse = impactPulseFor(time, config)
+    const impactEnergy = config.impact.enabled ? impactPulse * config.impact.intensity * (0.55 + config.impact.speed / 82) : 0
+    const impactX = clamp(config.impact.targetBias, -0.9, 0.9) * span * 0.48
     const stiffness = Math.max(0.2, config.bridge.stiffness)
     const damping = clamp(config.bridge.damping, 0.1, 1.4)
     const bridgeFactor = config.bridge.type === "arch" ? 0.86 : config.bridge.type === "truss" ? 0.94 : 1.08
@@ -123,18 +132,21 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
       const modal = Math.sin(time * (1.7 + windSpeed / 80) + normalized * Math.PI * 2)
       const torsion = Math.sin(time * 2.3 + index * 0.62)
       const loadInfluence = loadProfile[index] ?? 0
+      const impactInfluence = bell(normalized * 2 - 1, clamp(config.impact.targetBias, -0.9, 0.9), Math.max(0.09, config.impact.radius))
       const verticalDirection = config.earthquake.direction === "lateral" ? 0.35 : 1
       const lateralDirection = config.earthquake.direction === "vertical" ? 0.35 : 1
       const verticalDeflection = -shape * (loadInfluence * 1.7 + (windSpeed / 60) * 0.42) / stiffness
       const windSway = shape * (windSpeed / 52) * (0.45 + config.wind.gustiness) * Math.sin(time * 1.2 + normalized * 2.5) / damping
       const quakeVertical = earthquakeForce * verticalDirection * shape * 0.9 / stiffness
       const quakeLateral = earthquakeForce * lateralDirection * edgeRelief * 1.45 / damping
+      const impactVertical = -impactEnergy * impactInfluence * (2.1 + config.impact.radius * 2.8) / stiffness
+      const impactLateral = impactEnergy * impactInfluence * Math.sin((config.impact.angle * Math.PI) / 180) * 1.8 / damping
       const oscillation = modal * shape * (0.18 + windSpeed / 260) / damping
       const collapsePull = failureProgress > 0 ? Math.pow(failureProgress, 1.45) * (1.2 + shape * 7.8) : 0
       const snapSide = failureProgress > 0 && failureNodeIndex !== undefined ? Math.sign(index - failureNodeIndex || 1) : 1
       const x = node.baseX + failureProgress * snapSide * shape * 2.1
-      const y = node.baseY + verticalDeflection + quakeVertical + oscillation - collapsePull
-      const z = node.baseZ + windSway + quakeLateral + torsion * shape * 0.16 + failureProgress * snapSide * shape * 3.1
+      const y = node.baseY + verticalDeflection + quakeVertical + impactVertical + oscillation - collapsePull
+      const z = node.baseZ + windSway + quakeLateral + impactLateral + torsion * shape * 0.16 + failureProgress * snapSide * shape * 3.1
       const stress =
         bridgeFactor *
         edgeRelief *
@@ -142,6 +154,7 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
           loadInfluence * 0.66 +
           windSpeed / 118 +
           Math.abs(earthquakeForce) * 0.72 +
+          impactEnergy * impactInfluence * 1.38 +
           Math.abs(windSway) * 0.18 +
           Math.abs(verticalDeflection) * 0.22)
       const distance = Math.sqrt(Math.pow(x - node.baseX, 2) + Math.pow(y - node.baseY, 2) + Math.pow(z - node.baseZ, 2))
@@ -163,7 +176,7 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     }
 
     const maxStress = Math.max(...nodes.map((node) => node.stress), ...segmentStress)
-    accumulatedDamage = clamp(accumulatedDamage + Math.max(0, maxStress - threshold * 0.86) * dt * 0.13, 0, 1)
+    accumulatedDamage = clamp(accumulatedDamage + Math.max(0, maxStress - threshold * 0.86) * dt * 0.13 + impactEnergy * dt * 0.16, 0, 1)
 
     if (failureTime === undefined && (maxStress > threshold || accumulatedDamage > 0.82)) {
       failureTime = time
@@ -185,6 +198,8 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
       lateralSway: centreNode.z,
       windSpeed,
       earthquakeForce,
+      impactForce: impactEnergy,
+      impactX,
       loadProfile,
       damage: accumulatedDamage,
     })

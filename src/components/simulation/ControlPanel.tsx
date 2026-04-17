@@ -1,4 +1,4 @@
-import { Gauge, Layers, Mountain, Route, ShieldAlert, Wind } from "lucide-react"
+import { Flame, Gauge, Layers, Mountain, Route, ShieldAlert, Wind } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -71,7 +71,7 @@ export function ControlPanel() {
         </Select>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <Accordion type="multiple" defaultValue={["bridge", "load", "wind", "overlay"]} className="px-4">
+        <Accordion type="multiple" defaultValue={["bridge", "load", "wind", "impact", "overlay"]} className="px-4">
           <AccordionItem value="bridge">
             <AccordionTrigger><span className="flex items-center gap-2"><Mountain className="size-4 text-lime-500" /> Bridge</span></AccordionTrigger>
             <AccordionContent className="space-y-4">
@@ -165,6 +165,24 @@ export function ControlPanel() {
                   </SelectContent>
                 </Select>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="impact">
+            <AccordionTrigger><span className="flex items-center gap-2"><Flame className="size-4 text-orange-500" /> Asteroid / Meteor</span></AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <SwitchRow label="Meteor impact enabled" checked={config.impact.enabled} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, enabled: checked } }))} />
+              <SwitchRow label="Show impact effects" checked={config.impact.showEffects} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, showEffects: checked } }))} />
+              <SliderRow label="Impact time" value={config.impact.impactTime} min={0.8} max={config.timing.duration} step={0.1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, impactTime: value } }))} />
+              <SliderRow label="Impact intensity" value={config.impact.intensity} min={0.1} max={1.8} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, intensity: value } }))} />
+              <SliderRow label="Blast radius" value={config.impact.radius} min={0.08} max={0.55} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, radius: value } }))} />
+              <SliderRow label="Entry speed" value={config.impact.speed} min={24} max={120} step={1} unit="km/s" onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, speed: value } }))} />
+              <SliderRow label="Entry angle" value={config.impact.angle} min={-85} max={85} step={1} unit="deg" onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, angle: value } }))} />
+              <SliderRow label="Target bias" value={config.impact.targetBias} min={-0.9} max={0.9} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, targetBias: value } }))} />
+              <SliderRow label="Fragment count" value={config.impact.fragmentCount} min={24} max={420} step={4} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, fragmentCount: value } }))} />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Impact force is applied around the target point during the simulation, then replayed with a meteor trail, flash, shockwave, and fragment spray.
+              </p>
             </AccordionContent>
           </AccordionItem>
 

@@ -55,6 +55,18 @@ export type EarthquakeConfig = {
   waveform: QuakeWaveform
 }
 
+export type ImpactConfig = {
+  enabled: boolean
+  impactTime: number
+  intensity: number
+  radius: number
+  speed: number
+  angle: number
+  targetBias: number
+  fragmentCount: number
+  showEffects: boolean
+}
+
 export type CameraConfig = {
   cinematic: boolean
   autoOrbitSpeed: number
@@ -77,6 +89,7 @@ export type SimulationConfig = {
   load: LoadConfig
   wind: WindConfig
   earthquake: EarthquakeConfig
+  impact: ImpactConfig
   camera: CameraConfig
   overlay: OverlayConfig
 }
@@ -108,6 +121,8 @@ export type SimulationFrame = {
   lateralSway: number
   windSpeed: number
   earthquakeForce: number
+  impactForce: number
+  impactX: number
   loadProfile: number[]
   damage: number
 }
