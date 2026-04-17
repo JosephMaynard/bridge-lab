@@ -1,9 +1,9 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { Environment, Line, OrbitControls, PerspectiveCamera } from "@react-three/drei"
+import { Environment, Line, OrbitControls, PerspectiveCamera, Sky, Stars } from "@react-three/drei"
 import { useMemo, useRef } from "react"
 import * as THREE from "three"
 import { useSimulationStore } from "@/store/simulation-store"
-import type { BridgeNodeFrame, CameraMatrices, SimulationConfig, SimulationFrame } from "@/types/simulation"
+import type { BridgeNodeFrame, CameraMatrices, SimulationConfig, SimulationFrame, TimeOfDay } from "@/types/simulation"
 
 type BridgeSceneProps = {
   className?: string
@@ -31,6 +31,141 @@ const nodeTuple = (node: BridgeNodeFrame, yOffset = 0, zOffset = 0): [number, nu
   node.y + yOffset,
   node.z + zOffset,
 ]
+
+type AtmospherePreset = {
+  background: string
+  fog: string
+  fogNear: number
+  fogFar: number
+  sunPosition: [number, number, number]
+  skyEnabled: boolean
+  sky: {
+    turbidity: number
+    rayleigh: number
+    mieCoefficient: number
+    mieDirectionalG: number
+  }
+  ambientColor: string
+  ambientIntensity: number
+  directionalColor: string
+  directionalIntensity: number
+  waterColor: string
+  waterOpacity: number
+  rimColor: string
+  rimIntensity: number
+  stars: boolean
+  moon: boolean
+  bridgeLights: boolean
+  environmentPreset: "sunset" | "dawn" | "night" | "city" | "park" | "studio"
+}
+
+const atmospherePresets: Record<TimeOfDay, AtmospherePreset> = {
+  dawn: {
+    background: "#c8ddeb",
+    fog: "#c7d8d5",
+    fogNear: 34,
+    fogFar: 105,
+    sunPosition: [-24, 14, -18],
+    skyEnabled: false,
+    sky: { turbidity: 4.2, rayleigh: 1.1, mieCoefficient: 0.002, mieDirectionalG: 0.66 },
+    ambientColor: "#c9e4de",
+    ambientIntensity: 0.6,
+    directionalColor: "#ffb587",
+    directionalIntensity: 1.55,
+    waterColor: "#0f7280",
+    waterOpacity: 0.62,
+    rimColor: "#ff946d",
+    rimIntensity: 13,
+    stars: false,
+    moon: false,
+    bridgeLights: false,
+    environmentPreset: "dawn",
+  },
+  day: {
+    background: "#95c7ec",
+    fog: "#4a7f87",
+    fogNear: 46,
+    fogFar: 122,
+    sunPosition: [24, 34, 18],
+    skyEnabled: true,
+    sky: { turbidity: 2.1, rayleigh: 0.7, mieCoefficient: 0.0012, mieDirectionalG: 0.58 },
+    ambientColor: "#d9f1ee",
+    ambientIntensity: 0.6,
+    directionalColor: "#fff6dd",
+    directionalIntensity: 1.85,
+    waterColor: "#0d7888",
+    waterOpacity: 0.64,
+    rimColor: "#69dfcf",
+    rimIntensity: 9,
+    stars: false,
+    moon: false,
+    bridgeLights: false,
+    environmentPreset: "park",
+  },
+  golden: {
+    background: "#07100f",
+    fog: "#0a1613",
+    fogNear: 38,
+    fogFar: 94,
+    sunPosition: [14, 22, 8],
+    skyEnabled: false,
+    sky: { turbidity: 3, rayleigh: 0.9, mieCoefficient: 0.001, mieDirectionalG: 0.58 },
+    ambientColor: "#ffffff",
+    ambientIntensity: 0.58,
+    directionalColor: "#fff7df",
+    directionalIntensity: 2.4,
+    waterColor: "#0c6f7f",
+    waterOpacity: 0.66,
+    rimColor: "#51d6c3",
+    rimIntensity: 18,
+    stars: false,
+    moon: false,
+    bridgeLights: false,
+    environmentPreset: "night",
+  },
+  sunset: {
+    background: "#182d35",
+    fog: "#102622",
+    fogNear: 34,
+    fogFar: 94,
+    sunPosition: [-24, 10, -18],
+    skyEnabled: false,
+    sky: { turbidity: 4, rayleigh: 0.8, mieCoefficient: 0.003, mieDirectionalG: 0.72 },
+    ambientColor: "#b9d8d2",
+    ambientIntensity: 0.48,
+    directionalColor: "#ff7a38",
+    directionalIntensity: 1.85,
+    waterColor: "#064d5c",
+    waterOpacity: 0.68,
+    rimColor: "#ff6d3f",
+    rimIntensity: 16,
+    stars: false,
+    moon: false,
+    bridgeLights: true,
+    environmentPreset: "sunset",
+  },
+  night: {
+    background: "#040b0c",
+    fog: "#061111",
+    fogNear: 24,
+    fogFar: 78,
+    sunPosition: [-16, -8, 24],
+    skyEnabled: false,
+    sky: { turbidity: 1.8, rayleigh: 0.26, mieCoefficient: 0.001, mieDirectionalG: 0.5 },
+    ambientColor: "#8db9cf",
+    ambientIntensity: 0.42,
+    directionalColor: "#9fd7ff",
+    directionalIntensity: 1.05,
+    waterColor: "#063f49",
+    waterOpacity: 0.69,
+    rimColor: "#58d7ff",
+    rimIntensity: 14,
+    stars: true,
+    moon: true,
+    bridgeLights: true,
+    environmentPreset: "night",
+  },
+}
 
 function CameraDirector({ config, frame }: { config: SimulationConfig; frame?: SimulationFrame }) {
   const { camera, size } = useThree()
@@ -63,30 +198,94 @@ function CameraDirector({ config, frame }: { config: SimulationConfig; frame?: S
   return null
 }
 
-function Atmosphere() {
+function BridgeLights({ spanLength, enabled }: { spanLength: number; enabled: boolean }) {
+  if (!enabled) return null
+
+  return (
+    <group>
+      {Array.from({ length: 11 }, (_, index) => {
+        const normal = index / 10
+        const x = (normal - 0.5) * spanLength
+        return (
+          <group key={`bridge-light-${index}`} position={[x, 0.78, -3.05]}>
+            <mesh>
+              <sphereGeometry args={[0.08, 10, 8]} />
+              <meshBasicMaterial color="#ffd975" />
+            </mesh>
+            <pointLight color="#ffc35a" intensity={index % 2 === 0 ? 1.8 : 1.2} distance={5.8} decay={2} />
+          </group>
+        )
+      })}
+      {Array.from({ length: 11 }, (_, index) => {
+        const normal = index / 10
+        const x = (normal - 0.5) * spanLength
+        return (
+          <group key={`bridge-light-r-${index}`} position={[x, 0.78, 3.05]}>
+            <mesh>
+              <sphereGeometry args={[0.08, 10, 8]} />
+              <meshBasicMaterial color="#ffd975" />
+            </mesh>
+            <pointLight color="#ffc35a" intensity={index % 2 === 0 ? 1.8 : 1.2} distance={5.8} decay={2} />
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+function Atmosphere({ config }: { config: SimulationConfig }) {
   const water = useRef<THREE.MeshStandardMaterial>(null)
+  const preset = atmospherePresets[config.environment.timeOfDay]
 
   useFrame(({ clock }) => {
     if (water.current) {
       water.current.normalScale.setScalar(0.25 + Math.sin(clock.elapsedTime * 0.7) * 0.05)
-      water.current.opacity = 0.64 + Math.sin(clock.elapsedTime * 0.5) * 0.04
+      water.current.opacity = preset.waterOpacity + Math.sin(clock.elapsedTime * 0.5) * 0.035
     }
   })
 
   return (
     <>
-      <color attach="background" args={["#07100f"]} />
-      <fog attach="fog" args={["#0a1613", 38, 94]} />
-      <ambientLight intensity={0.58} />
-      <directionalLight position={[14, 22, 8]} intensity={2.4} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <pointLight position={[-16, 9, 16]} intensity={18} color="#51d6c3" />
+      <color attach="background" args={[preset.background]} />
+      <fog attach="fog" args={[preset.fog, preset.fogNear, preset.fogFar]} />
+      {preset.skyEnabled && (
+        <Sky
+          distance={450000}
+          sunPosition={preset.sunPosition}
+          turbidity={preset.sky.turbidity}
+          rayleigh={preset.sky.rayleigh}
+          mieCoefficient={preset.sky.mieCoefficient}
+          mieDirectionalG={preset.sky.mieDirectionalG}
+        />
+      )}
+      {preset.stars && <Stars radius={110} depth={56} count={2600} factor={4.2} saturation={0.18} fade speed={0.28} />}
+      {preset.moon && (
+        <group position={[-28, 32, -48]}>
+          <mesh>
+            <sphereGeometry args={[1.35, 32, 16]} />
+            <meshBasicMaterial color="#d7f0ff" />
+          </mesh>
+          <pointLight color="#bfe7ff" intensity={12} distance={68} />
+        </group>
+      )}
+      <ambientLight color={preset.ambientColor} intensity={preset.ambientIntensity} />
+      <directionalLight
+        position={preset.sunPosition}
+        color={preset.directionalColor}
+        intensity={preset.directionalIntensity}
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+      />
+      <pointLight position={[-16, 9, 16]} intensity={preset.rimIntensity} color={preset.rimColor} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -4.15, 0]} receiveShadow>
         <planeGeometry args={[140, 80, 48, 24]} />
-        <meshStandardMaterial ref={water} color="#0c6f7f" metalness={0.15} roughness={0.18} transparent opacity={0.66} />
+        <meshStandardMaterial ref={water} color={preset.waterColor} metalness={0.15} roughness={0.18} transparent opacity={preset.waterOpacity} />
       </mesh>
       <Landmass x={-27} />
       <Landmass x={27} mirrored />
-      <Environment preset="night" />
+      <BridgeLights spanLength={config.bridge.spanLength} enabled={preset.bridgeLights} />
+      <Environment preset={preset.environmentPreset} />
     </>
   )
 }
@@ -542,7 +741,7 @@ function SceneContents() {
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 12, 48]} fov={42} near={0.1} far={220} />
-      <Atmosphere />
+      <Atmosphere config={config} />
       <BridgeModel config={config} frame={frame} />
       <WindParticles config={config} frame={frame} />
       <MeteorImpact config={config} frame={frame} />

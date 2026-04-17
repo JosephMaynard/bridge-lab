@@ -58,6 +58,9 @@ export const defaultConfig: SimulationConfig = {
     fragmentCount: 180,
     showEffects: true,
   },
+  environment: {
+    timeOfDay: "golden",
+  },
   camera: {
     cinematic: true,
     autoOrbitSpeed: 0.14,
@@ -87,6 +90,7 @@ export const presets: PresetScenario[] = [
       wind: { ...defaultConfig.wind, speed: 10, gustiness: 0.12, turbulence: 0.14, particleCount: 300 },
       load: { ...defaultConfig.load, totalWeight: 34, loadPoints: 4, movingSpeed: 0.25 },
       bridge: { ...defaultConfig.bridge, stiffness: 1.65, failureThreshold: 1.42 },
+      environment: { timeOfDay: "day" },
     },
   },
   {
@@ -98,6 +102,7 @@ export const presets: PresetScenario[] = [
       wind: { ...defaultConfig.wind, speed: 42, gustiness: 0.62, turbulence: 0.64, direction: -42, particleCount: 860 },
       load: { ...defaultConfig.load, totalWeight: 58, distribution: "offset", bias: 0.22 },
       bridge: { ...defaultConfig.bridge, stiffness: 1.16, damping: 0.48, failureThreshold: 1.18 },
+      environment: { timeOfDay: "sunset" },
     },
   },
   {
@@ -110,6 +115,7 @@ export const presets: PresetScenario[] = [
       wind: { ...defaultConfig.wind, speed: 18, gustiness: 0.24, turbulence: 0.36, particleCount: 420 },
       earthquake: { ...defaultConfig.earthquake, enabled: true, intensity: 0.82, frequency: 2.7, duration: 10.5, direction: "mixed", waveform: "pulse" },
       load: { ...defaultConfig.load, totalWeight: 70, distribution: "centre", movingLoad: false },
+      environment: { timeOfDay: "night" },
     },
   },
   {
@@ -121,6 +127,7 @@ export const presets: PresetScenario[] = [
       bridge: { ...defaultConfig.bridge, type: "arch", stiffness: 1.28, towerHeight: 7.2, supports: 10 },
       load: { ...defaultConfig.load, totalWeight: 98, loadPoints: 10, distribution: "centre", bias: -0.05, movingLoad: true, movingSpeed: 0.18 },
       wind: { ...defaultConfig.wind, speed: 18, gustiness: 0.22, turbulence: 0.24, particleCount: 380 },
+      environment: { timeOfDay: "golden" },
     },
   },
   {
@@ -134,6 +141,7 @@ export const presets: PresetScenario[] = [
       wind: { ...defaultConfig.wind, speed: 34, gustiness: 0.46, turbulence: 0.62, particleCount: 900, particleTrail: 0.8 },
       impact: { ...defaultConfig.impact, enabled: true, impactTime: 6.8, intensity: 1.05, radius: 0.28, speed: 72, angle: -48, targetBias: 0.02, fragmentCount: 260 },
       load: { ...defaultConfig.load, totalWeight: 66, distribution: "centre" },
+      environment: { timeOfDay: "sunset" },
     },
   },
   {
@@ -147,6 +155,7 @@ export const presets: PresetScenario[] = [
       earthquake: { ...defaultConfig.earthquake, enabled: true, intensity: 0.74, frequency: 3.2, duration: 12, direction: "mixed", waveform: "saw" },
       impact: { ...defaultConfig.impact, enabled: true, impactTime: 5.4, intensity: 0.78, radius: 0.32, speed: 66, angle: 42, targetBias: -0.18, fragmentCount: 240 },
       load: { ...defaultConfig.load, totalWeight: 118, loadPoints: 12, distribution: "random", movingLoad: true, movingSpeed: 0.58 },
+      environment: { timeOfDay: "night" },
     },
   },
 ]
@@ -155,4 +164,12 @@ export const bridgeTypeLabels = {
   suspension: "Suspension",
   arch: "Arch",
   truss: "Beam / Truss",
+} as const
+
+export const timeOfDayLabels = {
+  dawn: "Dawn",
+  day: "Day",
+  golden: "Golden Hour",
+  sunset: "Sunset",
+  night: "Night",
 } as const

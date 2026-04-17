@@ -3,6 +3,7 @@ export type LoadDistributionMode = "centre" | "even" | "offset" | "random"
 export type QuakeDirection = "vertical" | "lateral" | "mixed"
 export type QuakeWaveform = "sine" | "pulse" | "saw"
 export type StressPalette = "thermal" | "viridis" | "critical"
+export type TimeOfDay = "dawn" | "day" | "golden" | "sunset" | "night"
 
 export type BridgeConfig = {
   type: BridgeType
@@ -67,6 +68,10 @@ export type ImpactConfig = {
   showEffects: boolean
 }
 
+export type EnvironmentConfig = {
+  timeOfDay: TimeOfDay
+}
+
 export type CameraConfig = {
   cinematic: boolean
   autoOrbitSpeed: number
@@ -90,6 +95,7 @@ export type SimulationConfig = {
   wind: WindConfig
   earthquake: EarthquakeConfig
   impact: ImpactConfig
+  environment: EnvironmentConfig
   camera: CameraConfig
   overlay: OverlayConfig
 }

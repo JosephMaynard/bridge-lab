@@ -52,6 +52,8 @@ Meteor impacts are simulation inputs and visual events. The engine applies a loc
 
 React Three Fiber owns the main cinematic scene: bridge geometry, landmasses, water, particles, camera motion, manual orbit controls, and collapse animation.
 
+The scene atmosphere is driven by the `environment.timeOfDay` control. `BridgeScene.tsx` uses Drei `Sky`, `Environment`, and `Stars` to swap between Dawn, Day, Golden Hour, Sunset, and Night. Each mode changes sky tone, sun position, ambient and directional light, fog, water tint, stars, moonlight, and bridge lights as one coherent preset. The default Golden Hour mode intentionally stays close to the original dark cinematic look.
+
 The VTK overlay uses the same replay frame. `StressOverlay.tsx` converts the current intact bridge frame into a vtk.js `PolyData` scalar dataset, then draws stress-coloured bridge segments onto an absolutely positioned canvas over the R3F canvas. The R3F camera publishes projection and view matrices through Zustand, so the overlay projects the same 3D node positions into the same viewport.
 
 After failure, the overlay intentionally freezes on the last intact frame while the R3F layer continues showing the collapse. This keeps stress analysis readable without hiding the cinematic failure replay.
@@ -68,6 +70,8 @@ Adjust presets in `src/features/bridge-sim/config.ts`. The exported `presets` ar
 - Extreme Chaos
 
 Add or tune controls by extending `SimulationConfig` in `src/types/simulation.ts`, updating defaults/presets in `config.ts`, and wiring UI bindings in `src/components/simulation/ControlPanel.tsx`.
+
+Sky presets live in `src/features/bridge-sim/scene/BridgeScene.tsx` as `atmospherePresets`. Scenario defaults choose their time of day in `src/features/bridge-sim/config.ts`.
 
 Useful store actions are in `src/store/simulation-store.ts`:
 

@@ -1,4 +1,4 @@
-import { Flame, Gauge, Layers, Mountain, Route, ShieldAlert, Wind } from "lucide-react"
+import { CloudSun, Flame, Gauge, Layers, Mountain, Route, ShieldAlert, Wind } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
-import { bridgeTypeLabels, presets } from "@/features/bridge-sim/config"
+import { bridgeTypeLabels, presets, timeOfDayLabels } from "@/features/bridge-sim/config"
 import { useSimulationStore } from "@/store/simulation-store"
-import type { BridgeType, LoadDistributionMode, QuakeDirection, QuakeWaveform, StressPalette } from "@/types/simulation"
+import type { BridgeType, LoadDistributionMode, QuakeDirection, QuakeWaveform, StressPalette, TimeOfDay } from "@/types/simulation"
 
 type SliderRowProps = {
   label: string
@@ -38,6 +38,35 @@ function SwitchRow({ label, checked, onCheckedChange }: { label: string; checked
     <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-background/45 p-3">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  )
+}
+
+const timeOfDayOptions = Object.keys(timeOfDayLabels) as TimeOfDay[]
+
+function TimeOfDaySlider({ value, onChange }: { value: TimeOfDay; onChange: (value: TimeOfDay) => void }) {
+  const currentIndex = Math.max(0, timeOfDayOptions.indexOf(value))
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs text-muted-foreground">Time of day</Label>
+        <span className="text-xs font-medium text-foreground">{timeOfDayLabels[value]}</span>
+      </div>
+      <Slider
+        value={[currentIndex]}
+        min={0}
+        max={timeOfDayOptions.length - 1}
+        step={1}
+        onValueChange={(next) => onChange(timeOfDayOptions[next[0] ?? currentIndex] ?? value)}
+      />
+      <div className="grid grid-cols-5 gap-1 text-center text-[10px] leading-tight text-muted-foreground">
+        {timeOfDayOptions.map((option) => (
+          <span key={option} className={option === value ? "font-medium text-foreground" : undefined}>
+            {timeOfDayLabels[option]}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -71,7 +100,7 @@ export function ControlPanel() {
         </Select>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <Accordion type="multiple" defaultValue={["bridge", "load", "wind", "impact", "overlay"]} className="px-4">
+        <Accordion type="multiple" defaultValue={["bridge", "load", "wind", "environment", "impact", "overlay"]} className="px-4">
           <AccordionItem value="bridge">
             <AccordionTrigger><span className="flex items-center gap-2"><Mountain className="size-4 text-lime-500" /> Bridge</span></AccordionTrigger>
             <AccordionContent className="space-y-4">
@@ -165,6 +194,19 @@ export function ControlPanel() {
                   </SelectContent>
                 </Select>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="environment">
+            <AccordionTrigger><span className="flex items-center gap-2"><CloudSun className="size-4 text-sky-500" /> Sky</span></AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <TimeOfDaySlider
+                value={config.environment.timeOfDay}
+                onChange={(value) => updateConfig((draft) => ({ ...draft, environment: { ...draft.environment, timeOfDay: value } }))}
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Time of day adjusts the sky tone, sun and moon light, fog colour, water tint, stars, and bridge lights.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
