@@ -26,6 +26,25 @@ const seededParticle = (index: number, salt: number) => {
   return value - Math.floor(value)
 }
 
+const smoothStep = (value: number) => value * value * (3 - 2 * value)
+
+const perlinNoise1d = (value: number, seed: number) => {
+  const base = Math.floor(value)
+  const fraction = value - base
+  const leftGradient = seededParticle(base + seed * 101, 17.17 + seed) * 2 - 1
+  const rightGradient = seededParticle(base + 1 + seed * 101, 17.17 + seed) * 2 - 1
+  return THREE.MathUtils.lerp(leftGradient * fraction, rightGradient * (fraction - 1), smoothStep(fraction)) * 2
+}
+
+const layeredIslandNoise = (angle: number, seed: number) => {
+  const u = (angle + Math.PI) / (Math.PI * 2)
+  return (
+    perlinNoise1d(u * 5 + 11, seed) * 0.5 +
+    perlinNoise1d(u * 11 + 3, seed + 7) * 0.32 +
+    perlinNoise1d(u * 19 + 29, seed + 13) * 0.18
+  )
+}
+
 const nodeTuple = (node: BridgeNodeFrame, yOffset = 0, zOffset = 0): [number, number, number] => [
   node.x,
   node.y + yOffset,
@@ -105,8 +124,8 @@ const atmospherePresets: Record<TimeOfDay, AtmospherePreset> = {
   golden: {
     background: "#07100f",
     fog: "#0a1613",
-    fogNear: 38,
-    fogFar: 94,
+    fogNear: 82,
+    fogFar: 190,
     sunPosition: [14, 22, 8],
     skyEnabled: false,
     sky: { turbidity: 3, rayleigh: 0.9, mieCoefficient: 0.001, mieDirectionalG: 0.58 },
@@ -147,8 +166,8 @@ const atmospherePresets: Record<TimeOfDay, AtmospherePreset> = {
   night: {
     background: "#040b0c",
     fog: "#061111",
-    fogNear: 24,
-    fogFar: 78,
+    fogNear: 62,
+    fogFar: 150,
     sunPosition: [-16, -8, 24],
     skyEnabled: false,
     sky: { turbidity: 1.8, rayleigh: 0.26, mieCoefficient: 0.001, mieDirectionalG: 0.5 },
@@ -269,6 +288,7 @@ function Atmosphere({ config }: { config: SimulationConfig }) {
         </group>
       )}
       <ambientLight color={preset.ambientColor} intensity={preset.ambientIntensity} />
+      <hemisphereLight color="#b9f3df" groundColor="#12302a" intensity={0.34} />
       <directionalLight
         position={preset.sunPosition}
         color={preset.directionalColor}
@@ -290,24 +310,142 @@ function Atmosphere({ config }: { config: SimulationConfig }) {
   )
 }
 
+type IslandPoint = {
+  x: number
+  z: number
+}
+
+const baseIslandProfile: IslandPoint[] = [
+  { x: 8.8, z: -3.35 },
+  { x: 9.45, z: -1.8 },
+  { x: 9.3, z: 1.9 },
+  { x: 8.45, z: 3.55 },
+  { x: 5.4, z: 5.85 },
+  { x: 0.2, z: 7.25 },
+  { x: -5.9, z: 6.35 },
+  { x: -10.85, z: 3.55 },
+  { x: -12.15, z: 0.2 },
+  { x: -11.1, z: -3.6 },
+  { x: -6.1, z: -6.55 },
+  { x: -0.9, z: -7.35 },
+  { x: 4.7, z: -6.05 },
+]
+
+const sampleIslandProfile = (seed: number, scale: number, roughness: number) =>
+  baseIslandProfile.map((point, index): IslandPoint => {
+    const angle = Math.atan2(point.z, point.x)
+    const frontPad = point.x > 7.7
+    const noise = frontPad ? 0 : layeredIslandNoise(angle, seed + index * 0.41) * roughness
+    const outward = frontPad ? 1 : 1 + noise
+    const belowWaterPush = scale > 1.08 && point.x < 8 ? 0.34 * (scale - 1) : 0
+    return {
+      x: point.x * scale * outward - belowWaterPush,
+      z: point.z * scale * (frontPad ? 1 : 1 + noise * 0.58),
+    }
+  })
+
+const createIslandBodyGeometry = (seed: number) => {
+  const top = sampleIslandProfile(seed, 1, 0.1)
+  const mid = sampleIslandProfile(seed + 4, 1.08, 0.13)
+  const waterline = sampleIslandProfile(seed + 9, 1.16, 0.15)
+  const base = sampleIslandProfile(seed + 14, 1.24, 0.11)
+  const rings = [
+    { y: -0.2, points: top },
+    { y: -1.75, points: mid },
+    { y: -3.95, points: waterline },
+    { y: -4.9, points: base },
+  ]
+  const vertices: number[] = []
+  const indices: number[] = []
+  const segments = top.length
+
+  rings.forEach((ring, ringIndex) => {
+    ring.points.forEach((point, index) => {
+      const angle = (index / segments) * Math.PI * 2
+      const y = ring.y + (ringIndex === 0 ? 0 : layeredIslandNoise(angle + ringIndex * 0.37, seed + 23) * 0.08)
+      vertices.push(point.x, y, point.z)
+    })
+  })
+
+  for (let ringIndex = 0; ringIndex < rings.length - 1; ringIndex += 1) {
+    const current = ringIndex * segments
+    const next = (ringIndex + 1) * segments
+    for (let index = 0; index < segments; index += 1) {
+      const a = current + index
+      const b = current + ((index + 1) % segments)
+      const c = next + index
+      const d = next + ((index + 1) % segments)
+      indices.push(a, b, c, b, d, c)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
+const createIslandTopGeometry = (seed: number) => {
+  const ring = sampleIslandProfile(seed, 0.99, 0.08)
+  const vertices = [-1.5, -0.18, 0]
+  const indices: number[] = []
+
+  ring.forEach((point) => vertices.push(point.x, -0.18, point.z))
+  for (let index = 0; index < ring.length; index += 1) {
+    indices.push(0, ((index + 1) % ring.length) + 1, index + 1)
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 function Landmass({ x, mirrored = false }: { x: number; mirrored?: boolean }) {
+  const seed = mirrored ? 19 : 7
+  const cliffGeometry = useMemo(() => createIslandBodyGeometry(seed), [seed])
+  const topGeometry = useMemo(() => createIslandTopGeometry(seed), [seed])
+  const shorelineRocks = useMemo(
+    () =>
+      Array.from({ length: 10 }, (_, index) => {
+        const ring = sampleIslandProfile(seed + 5, 1.18, 0.12)[Math.floor((index / 10) * baseIslandProfile.length)]
+        const outward = 0.9 + seededParticle(index, seed + 8.1) * 0.08
+        return {
+          position: [ring.x * outward, -3.86 + seededParticle(index, seed + 3.2) * 0.34, ring.z * outward] as [number, number, number],
+          rotation: [
+            seededParticle(index, seed + 2.1) * Math.PI,
+            seededParticle(index, seed + 0.4) * Math.PI * 2,
+            seededParticle(index, seed + 4.7) * Math.PI,
+          ] as [number, number, number],
+          scale: [
+            0.88 + seededParticle(index, seed + 1.2) * 1.08,
+            0.42 + seededParticle(index, seed + 6.6) * 0.72,
+            0.74 + seededParticle(index, seed + 9.4) * 0.92,
+          ] as [number, number, number],
+        }
+      }),
+    [seed],
+  )
+
   return (
-    <group position={[x, -2.85, 0]} rotation={[0, mirrored ? Math.PI : 0, 0]}>
-      <mesh castShadow receiveShadow position={[0, 0, 0]} scale={[13, 3.1, 15]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#385044" roughness={0.92} />
+    <group position={[x, 0, 0]} rotation={[0, mirrored ? Math.PI : 0, 0]}>
+      <mesh castShadow receiveShadow geometry={cliffGeometry}>
+        <meshStandardMaterial color="#2d4035" roughness={0.94} metalness={0.04} flatShading />
       </mesh>
-      <mesh castShadow receiveShadow position={[-4.4, 1.35, -2.1]} rotation={[0.1, 0.34, -0.08]} scale={[8.5, 3.6, 9]}>
-        <dodecahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#536c5e" roughness={0.94} />
+      <mesh receiveShadow geometry={topGeometry}>
+        <meshStandardMaterial color="#5f7b60" roughness={0.9} metalness={0.02} flatShading />
       </mesh>
-      <mesh castShadow receiveShadow position={[4.8, 1.1, 2.7]} rotation={[0.2, -0.24, 0.1]} scale={[7.8, 2.8, 8.2]}>
-        <dodecahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#24362f" roughness={0.9} />
-      </mesh>
-      <mesh receiveShadow position={[0, 3.05, 0]} scale={[13.5, 0.16, 15.4]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#5e7f64" roughness={0.88} />
+      {shorelineRocks.map((rock, index) => (
+        <mesh key={`shore-rock-${index}`} castShadow receiveShadow position={rock.position} rotation={rock.rotation} scale={rock.scale}>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color={index % 3 === 0 ? "#1e2e28" : "#34463b"} roughness={0.96} flatShading />
+        </mesh>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-1.4, -3.78, 0]} scale={[11, 5.8, 1]}>
+        <circleGeometry args={[1, 36]} />
+        <meshBasicMaterial color="#b9d8d0" transparent opacity={0.035} depthWrite={false} />
       </mesh>
     </group>
   )
@@ -359,11 +497,14 @@ function DeckSegment({
 
 function Tower({ x, height, width, stress }: { x: number; height: number; width: number; stress: number }) {
   const color = stressColor(stress, 1.15)
+  const baseY = -4.25
+  const legHeight = height - baseY
+  const legCentreY = baseY + legHeight / 2
   return (
     <group position={[x, 0, 0]}>
       {[-1, 1].map((side) => (
-        <mesh key={side} castShadow receiveShadow position={[0, height / 2 - 0.15, side * width * 0.54]}>
-          <boxGeometry args={[0.55, height, 0.48]} />
+        <mesh key={side} castShadow receiveShadow position={[0, legCentreY, side * width * 0.54]}>
+          <boxGeometry args={[0.62, legHeight, 0.54]} />
           <meshStandardMaterial color={color} metalness={0.42} roughness={0.4} />
         </mesh>
       ))}
@@ -371,6 +512,83 @@ function Tower({ x, height, width, stress }: { x: number; height: number; width:
         <boxGeometry args={[1, 0.42, width * 1.24]} />
         <meshStandardMaterial color="#d6e2d5" metalness={0.3} roughness={0.34} />
       </mesh>
+    </group>
+  )
+}
+
+function SupportPier({ node, color }: { node: BridgeNodeFrame; color: string }) {
+  const bottom = -4.2
+  const top = node.y - 0.18
+  const height = Math.max(0.4, top - bottom)
+
+  return (
+    <mesh castShadow receiveShadow position={[node.x, bottom + height / 2, node.z]}>
+      <cylinderGeometry args={[0.18, 0.24, height, 12]} />
+      <meshStandardMaterial color={color} metalness={0.26} roughness={0.48} />
+    </mesh>
+  )
+}
+
+const renderLoadCentreFor = (config: SimulationConfig, time: number) => {
+  if (config.load.movingLoad) {
+    const travel = (time * config.load.movingSpeed * 0.16) % 1.4
+    return clamp(-0.7 + travel + config.load.bias * 0.42, -0.62, 0.62)
+  }
+
+  if (config.load.distribution === "offset") return clamp(config.load.bias, -0.55, 0.55)
+  if (config.load.distribution === "random") return clamp((seededParticle(Math.round(config.load.totalWeight * 13), 9.77) - 0.5) * 0.92 + config.load.bias * 0.2, -0.55, 0.55)
+  return clamp(config.load.bias * 0.2, -0.35, 0.35)
+}
+
+function nodeAtNormalized(nodes: BridgeNodeFrame[], normalized: number) {
+  const target = clamp(normalized, 0, 1) * (nodes.length - 1)
+  const leftIndex = Math.floor(target)
+  const rightIndex = Math.min(nodes.length - 1, leftIndex + 1)
+  const blend = target - leftIndex
+  const left = nodes[leftIndex]
+  const right = nodes[rightIndex]
+  return {
+    x: THREE.MathUtils.lerp(left.x, right.x, blend),
+    y: THREE.MathUtils.lerp(left.y, right.y, blend),
+    z: THREE.MathUtils.lerp(left.z, right.z, blend),
+  }
+}
+
+function LoadTruck({ config, frame, failureProgress }: { config: SimulationConfig; frame: SimulationFrame; failureProgress: number }) {
+  if (config.load.totalWeight <= 0) return null
+
+  const centre = renderLoadCentreFor(config, frame.time)
+  const position = nodeAtNormalized(frame.nodes, (centre + 1) / 2)
+  const weightScale = clamp(config.load.totalWeight / 110, 0.55, 1.35)
+  const length = 1.65 + weightScale * 1.08
+  const width = clamp(config.bridge.deckWidth * 0.28, 1.25, 1.95)
+  const fall = failureProgress > 0 ? Math.pow(failureProgress, 1.4) : 0
+  const side = centre >= 0 ? 1 : -1
+  const truckY = position.y + 0.48 - fall * 7.4
+  const truckZ = position.z + side * fall * 2.2
+
+  return (
+    <group position={[position.x + side * fall * 1.4, truckY, truckZ]} rotation={[fall * 1.25, 0, side * fall * 1.8]} scale={[1, 1, 1]}>
+      <mesh castShadow receiveShadow position={[0, 0.22, 0]}>
+        <boxGeometry args={[length, 0.48, width]} />
+        <meshStandardMaterial color="#d7cc78" roughness={0.44} metalness={0.18} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[length * 0.34, 0.64, 0]}>
+        <boxGeometry args={[0.78, 0.78, width * 0.86]} />
+        <meshStandardMaterial color="#7edfd0" roughness={0.38} metalness={0.24} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[-length * 0.22, 0.62, 0]}>
+        <boxGeometry args={[length * 0.68, 0.62, width * 0.92]} />
+        <meshStandardMaterial color="#d0d8c8" roughness={0.52} metalness={0.12} />
+      </mesh>
+      {[-1, 1].flatMap((zSide) =>
+        [-0.34, 0.28].map((xOffset) => (
+          <mesh key={`${zSide}-${xOffset}`} castShadow receiveShadow position={[xOffset * length, -0.08, zSide * width * 0.46]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.16, 0.16, 0.16, 14]} />
+            <meshStandardMaterial color="#101816" roughness={0.7} />
+          </mesh>
+        )),
+      )}
     </group>
   )
 }
@@ -387,6 +605,7 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
   const railLeft = nodes.map((node) => nodeTuple(node, 0.54, -config.bridge.deckWidth / 2 - 0.18))
   const railRight = nodes.map((node) => nodeTuple(node, 0.54, config.bridge.deckWidth / 2 + 0.18))
   const suspensionCableSides = [-1, 1] as const
+  const bridgeSides = [-1, 1] as const
   const failureProgress =
     frame.failureTime === undefined
       ? 0
@@ -463,34 +682,77 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
       )}
       {config.bridge.type === "arch" && (
         <>
-          <Line
-            points={nodes.map((node) => {
-              const shape = Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5))
-              return [node.x, node.y - 3.2 + shape * config.bridge.towerHeight * 0.72, node.z] as [number, number, number]
-            })}
-            color="#f0d27a"
-            lineWidth={4}
-            transparent
-            opacity={fractureFade}
-          />
-          {nodes.filter((_, index) => index % 3 === 0).map((node) => (
-            <Line key={`arch-post-${node.id}`} points={[[node.x, node.y - 0.25, node.z], [node.x, node.y - 2.9 + Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5)) * config.bridge.towerHeight * 0.72, node.z]]} color="#d4e1d8" lineWidth={0.9} transparent opacity={fractureFade} />
-          ))}
+          {bridgeSides.map((side) => {
+            const archZ = side * (config.bridge.deckWidth / 2 + 0.12)
+            return (
+              <group key={`arch-side-${side}`}>
+                <Line
+                  points={nodes.map((node) => {
+                    const shape = Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5))
+                    return [node.x, node.y - 3.15 + shape * config.bridge.towerHeight * 0.72, archZ] as [number, number, number]
+                  })}
+                  color="#f0d27a"
+                  lineWidth={3.2}
+                  transparent
+                  opacity={fractureFade}
+                />
+                {nodes.filter((_, index) => index % 3 === 0).map((node) => {
+                  const shape = Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5))
+                  return (
+                    <Line
+                      key={`arch-post-${side}-${node.id}`}
+                      points={[[node.x, node.y - 0.18, archZ], [node.x, node.y - 2.9 + shape * config.bridge.towerHeight * 0.72, archZ]]}
+                      color="#d4e1d8"
+                      lineWidth={0.95}
+                      transparent
+                      opacity={fractureFade}
+                    />
+                  )
+                })}
+              </group>
+            )
+          })}
         </>
       )}
       {config.bridge.type === "truss" && (
         <>
-          {nodes.slice(0, -2).map((node, index) => (
-            <Line key={`truss-${node.id}`} points={[nodeTuple(node, 0.42, -config.bridge.deckWidth / 2), nodeTuple(nodes[index + 2], 1.8, config.bridge.deckWidth / 2)]} color={index % 2 === 0 ? "#e8d26a" : "#a7ded3"} lineWidth={1.2} transparent opacity={0.8 * fractureFade} />
-          ))}
-          <Line points={nodes.map((node) => nodeTuple(node, 1.85, 0))} color="#d8e8df" lineWidth={1.6} transparent opacity={fractureFade} />
+          {bridgeSides.map((side) => {
+            const trussZ = side * (config.bridge.deckWidth / 2 + 0.24)
+            const topChord = nodes.map((node) => nodeTuple(node, 1.58, trussZ))
+            const lowerChord = nodes.map((node) => nodeTuple(node, 0.52, trussZ))
+            return (
+              <group key={`truss-side-${side}`}>
+                <Line points={topChord} color="#d8e8df" lineWidth={1.7} transparent opacity={fractureFade} />
+                <Line points={lowerChord} color="#a7ded3" lineWidth={1.5} transparent opacity={fractureFade} />
+                {nodes.filter((_, index) => index % 4 === 0).map((node) => (
+                  <Line key={`truss-vertical-${side}-${node.id}`} points={[nodeTuple(node, 0.52, trussZ), nodeTuple(node, 1.58, trussZ)]} color="#cbdad2" lineWidth={1} transparent opacity={0.84 * fractureFade} />
+                ))}
+                {nodes.slice(0, -2).filter((_, index) => index % 2 === 0).map((node, index) => {
+                  const nodeIndex = index * 2
+                  const next = nodes[Math.min(nodes.length - 1, nodeIndex + 2)]
+                  const flip = nodeIndex % 4 === 0
+                  return (
+                    <Line
+                      key={`truss-diagonal-${side}-${node.id}`}
+                      points={flip ? [nodeTuple(node, 0.52, trussZ), nodeTuple(next, 1.58, trussZ)] : [nodeTuple(node, 1.58, trussZ), nodeTuple(next, 0.52, trussZ)]}
+                      color={flip ? "#e8d26a" : "#a7ded3"}
+                      lineWidth={1.15}
+                      transparent
+                      opacity={0.82 * fractureFade}
+                    />
+                  )
+                })}
+              </group>
+            )
+          })}
         </>
       )}
-      {Array.from({ length: config.bridge.supports }).map((_, index) => {
-        const nodeIndex = Math.round((index / Math.max(1, config.bridge.supports - 1)) * (nodes.length - 1))
+      {Array.from({ length: Math.max(2, config.bridge.supports) }).map((_, index, supports) => {
+        const nodeIndex = Math.round((index / Math.max(1, supports.length - 1)) * (nodes.length - 1))
         const node = nodes[nodeIndex]
-        return <Line key={`support-${node.id}`} points={[[node.x, node.y - 0.2, node.z], [node.x, -4, node.z]]} color={stressColor(frame.supportStress[index] ?? node.stress, threshold)} lineWidth={2.4} />
+        return <SupportPier key={`support-${node.id}`} node={node} color={stressColor(frame.supportStress[index] ?? node.stress, threshold)} />
       })}
+      <LoadTruck config={config} frame={frame} failureProgress={failureProgress} />
       {frame.failureNodeIndex !== undefined && config.overlay.showFailureZones && !frame.isStanding && (
         <mesh position={[nodes[frame.failureNodeIndex].x, nodes[frame.failureNodeIndex].y + 1.1, nodes[frame.failureNodeIndex].z]}>
           <sphereGeometry args={[1.1, 24, 16]} />
@@ -567,8 +829,8 @@ function WindParticles({ config, frame }: { config: SimulationConfig; frame?: Si
     const alongZ = Math.sin(angle)
     const crossX = -alongZ
     const crossZ = alongX
-    const fieldLength = 72
-    const fieldWidth = 34
+    const fieldLength = 118
+    const fieldWidth = 72
     const trailLength = 1.8 + config.wind.particleTrail * 8.5 + speed * 1.4
     for (let index = 0; index < count; index += 1) {
       const seed = seeds[index]
@@ -579,7 +841,7 @@ function WindParticles({ config, frame }: { config: SimulationConfig; frame?: Si
         Math.sin(clock.elapsedTime * 1.7 + index * 0.37) * config.wind.turbulence * 1.4 +
         Math.cos(clock.elapsedTime * 0.9 + index * 0.19) * config.wind.gustiness * 0.7
       const x = alongX * along + crossX * cross + crossX * turbulence
-      const y = -1.5 + seed[1] * 13 + Math.sin(clock.elapsedTime * 1.7 + index) * config.wind.turbulence * 0.36
+      const y = -2.4 + seed[1] * 17 + Math.sin(clock.elapsedTime * 1.7 + index) * config.wind.turbulence * 0.52
       const z = alongZ * along + crossZ * cross + crossZ * turbulence
       const base = index * 3
       positions[base] = x

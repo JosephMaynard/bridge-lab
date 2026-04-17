@@ -62,7 +62,7 @@ export function AppShell() {
         <div className="app-backdrop fixed inset-0 -z-10" />
         <header className="flex h-16 items-center justify-between border-b border-border/70 bg-background/88 px-3 backdrop-blur-xl sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <img src={logoUrl} alt="BridgeLab logo" className="size-10 rounded-md shadow-lg" />
+            <img src={logoUrl} alt="BridgeLab logo" className="size-10 rounded-lg dark:shadow-xl dark:shadow-slate-500/20 " />
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold tracking-tight">BridgeLab</h1>
             </div>

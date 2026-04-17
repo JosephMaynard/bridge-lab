@@ -1,6 +1,5 @@
 import { CloudSun, Flame, Gauge, Layers, Mountain, Route, ShieldAlert, Wind } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -75,6 +74,8 @@ export function ControlPanel() {
   const config = useSimulationStore((state) => state.config)
   const updateConfig = useSimulationStore((state) => state.updateConfig)
   const loadPreset = useSimulationStore((state) => state.loadPreset)
+  const controlPanelOpen = useSimulationStore((state) => state.controlPanelOpen)
+  const setControlPanelOpen = useSimulationStore((state) => state.setControlPanelOpen)
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r border-border/70 bg-card/76 backdrop-blur-xl">
@@ -82,9 +83,7 @@ export function ControlPanel() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold">Scenario</p>
-            <p className="text-xs text-muted-foreground">Load a preset, then tune it.</p>
           </div>
-          <Badge variant="secondary">Live config</Badge>
         </div>
         <Select onValueChange={loadPreset}>
           <SelectTrigger>
@@ -100,7 +99,7 @@ export function ControlPanel() {
         </Select>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <Accordion type="multiple" defaultValue={["bridge", "load", "wind", "environment", "impact", "overlay"]} className="px-4">
+        <Accordion type="multiple" value={controlPanelOpen} onValueChange={setControlPanelOpen} className="px-4">
           <AccordionItem value="bridge">
             <AccordionTrigger><span className="flex items-center gap-2"><Mountain className="size-4 text-lime-500" /> Bridge</span></AccordionTrigger>
             <AccordionContent className="space-y-4">
@@ -116,7 +115,7 @@ export function ControlPanel() {
               <SliderRow label="Span length" value={config.bridge.spanLength} min={28} max={52} step={1} unit="m" onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, spanLength: value } }))} />
               <SliderRow label="Deck width" value={config.bridge.deckWidth} min={3.2} max={8} step={0.1} unit="m" onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, deckWidth: value } }))} />
               <SliderRow label="Tower height" value={config.bridge.towerHeight} min={4} max={15} step={0.1} unit="m" onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, towerHeight: value } }))} />
-              <SliderRow label="Structural supports" value={config.bridge.supports} min={3} max={14} step={1} onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, supports: value } }))} />
+              <SliderRow label="Structural supports" value={config.bridge.supports} min={2} max={14} step={1} onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, supports: value } }))} />
               <SliderRow label="Cable sag / tension" value={config.bridge.cableSag} min={0.12} max={0.62} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, cableSag: value } }))} />
               <SliderRow label="Support spacing" value={config.bridge.supportSpacing} min={2.5} max={8} step={0.1} unit="m" onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, supportSpacing: value } }))} />
               <SliderRow label="Stiffness" value={config.bridge.stiffness} min={0.55} max={2.2} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, bridge: { ...draft.bridge, stiffness: value } }))} />
