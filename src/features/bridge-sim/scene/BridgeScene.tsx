@@ -419,11 +419,29 @@ function MeteorImpact({ config, frame }: { config: SimulationConfig; frame?: Sim
     const incomingProgress = clamp((localTime + approachDuration) / approachDuration, 0, 1)
     const meteorPosition = incomingStart.clone().lerp(impactPoint, incomingProgress)
     const tailEnd = meteorPosition.clone().add(incomingOffset.clone().normalize().multiplyScalar(8 + impact.speed * 0.12))
+    const trailDirection = tailEnd.clone().sub(meteorPosition).normalize()
+    const trailRight = new THREE.Vector3(0, 1, 0).cross(trailDirection).normalize()
+    const trailUp = trailDirection.clone().cross(trailRight).normalize()
+    const trailPuffs = localTime < 0
+      ? Array.from({ length: 34 }, (_, index) => {
+          const t = index / 33
+          const swirl = seededParticle(index, 64.4) * Math.PI * 2 + frame.time * 2.8
+          const radius = (0.22 + t * 1.8) * (0.8 + seededParticle(index, 13.8) * 0.7)
+          const centre = meteorPosition.clone().lerp(tailEnd, t)
+          centre.add(trailRight.clone().multiplyScalar(Math.cos(swirl) * radius))
+          centre.add(trailUp.clone().multiplyScalar(Math.sin(swirl) * radius * 0.72))
+          return {
+            position: centre.toArray() as [number, number, number],
+            scale: 0.34 + t * 2.1 + seededParticle(index, 24.1) * 0.65,
+            opacity: (1 - t) * 0.42 + 0.08,
+            color: t < 0.28 ? "#fff1a6" : t < 0.62 ? "#ff8c2e" : "#70483c",
+          }
+        })
+      : []
     const blastProgress = clamp(localTime / 4.2, 0, 1)
     const flash = localTime >= 0 && localTime < 0.85 ? 1 - localTime / 0.85 : 0
     const fragmentCount = localTime >= 0 ? Math.min(420, Math.max(24, Math.round(impact.fragmentCount))) : 0
     const debris = new Float32Array(fragmentCount * 3)
-    const streaks = new Float32Array(fragmentCount * 6)
 
     for (let index = 0; index < fragmentCount; index += 1) {
       const radial = seededParticle(index, 21.9) * Math.PI * 2
@@ -438,15 +456,6 @@ function MeteorImpact({ config, frame }: { config: SimulationConfig; frame?: Sim
       debris[base] = x
       debris[base + 1] = y
       debris[base + 2] = z
-
-      const streakBase = index * 6
-      const trailLength = 1.2 + seededParticle(index, 9.4) * 4.2
-      streaks[streakBase] = x
-      streaks[streakBase + 1] = y
-      streaks[streakBase + 2] = z
-      streaks[streakBase + 3] = x - Math.cos(radial) * trailLength
-      streaks[streakBase + 4] = y - 0.4 - trailLength * 0.25
-      streaks[streakBase + 5] = z - Math.sin(radial) * trailLength
     }
 
     return {
@@ -456,8 +465,8 @@ function MeteorImpact({ config, frame }: { config: SimulationConfig; frame?: Sim
       impactPoint,
       blastProgress,
       flash,
+      trailPuffs,
       debris,
-      streaks,
     }
   }, [
     frame,
@@ -484,6 +493,12 @@ function MeteorImpact({ config, frame }: { config: SimulationConfig; frame?: Sim
         <>
           <Line points={[data.meteorPosition.toArray(), data.tailEnd.toArray()]} color="#ff8a2d" lineWidth={11} transparent opacity={0.88} />
           <Line points={[data.meteorPosition.toArray(), data.tailEnd.clone().add(new THREE.Vector3(0, 1.6, 0)).toArray()]} color="#fff0bd" lineWidth={2.4} transparent opacity={0.72} />
+          {data.trailPuffs.map((puff, index) => (
+            <mesh key={`meteor-puff-${index}`} position={puff.position} scale={puff.scale}>
+              <sphereGeometry args={[1, 12, 8]} />
+              <meshBasicMaterial color={puff.color} transparent opacity={puff.opacity} depthWrite={false} blending={THREE.AdditiveBlending} />
+            </mesh>
+          ))}
           <mesh position={data.meteorPosition.toArray()} castShadow>
             <icosahedronGeometry args={[0.55 + config.impact.radius * 1.5, 2]} />
             <meshStandardMaterial color="#2a211f" emissive="#ff6a22" emissiveIntensity={2.8} roughness={0.7} />
@@ -507,20 +522,12 @@ function MeteorImpact({ config, frame }: { config: SimulationConfig; frame?: Sim
         </mesh>
       )}
       {data.debris.length > 0 && (
-        <>
-          <lineSegments>
-            <bufferGeometry>
-              <bufferAttribute attach="attributes-position" args={[data.streaks, 3]} />
-            </bufferGeometry>
-            <lineBasicMaterial color="#ff9f35" transparent opacity={0.78} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </lineSegments>
-          <points>
-            <bufferGeometry>
-              <bufferAttribute attach="attributes-position" args={[data.debris, 3]} />
-            </bufferGeometry>
-            <pointsMaterial color="#ffe176" size={0.2 + config.impact.radius * 0.45} transparent opacity={0.92} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </points>
-        </>
+        <points>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[data.debris, 3]} />
+          </bufferGeometry>
+          <pointsMaterial color="#ffe176" size={0.2 + config.impact.radius * 0.45} transparent opacity={0.92} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </points>
       )}
     </group>
   )

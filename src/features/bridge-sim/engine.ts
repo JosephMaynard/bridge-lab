@@ -80,6 +80,7 @@ const supportStressFor = (frameStress: number[], supports: number) => {
 
 const impactPulseFor = (time: number, config: SimulationConfig) => {
   if (!config.impact.enabled) return 0
+  if (time < config.impact.impactTime) return 0
   const width = clamp(0.24 + config.impact.radius * 0.62 + 42 / Math.max(32, config.impact.speed) * 0.08, 0.18, 0.58)
   return Math.exp(-Math.pow((time - config.impact.impactTime) / width, 2))
 }
@@ -178,7 +179,11 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     const maxStress = Math.max(...nodes.map((node) => node.stress), ...segmentStress)
     accumulatedDamage = clamp(accumulatedDamage + Math.max(0, maxStress - threshold * 0.86) * dt * 0.13 + impactEnergy * dt * 0.16, 0, 1)
 
-    if (failureTime === undefined && (maxStress > threshold || accumulatedDamage > 0.82)) {
+    const beforeMeteorStrike = config.impact.enabled && time < config.impact.impactTime
+    const stressFailureLimit = beforeMeteorStrike ? threshold * (1.55 + config.impact.intensity * 0.18) : threshold
+    const damageFailureLimit = beforeMeteorStrike ? 0.98 : 0.82
+
+    if (failureTime === undefined && (maxStress > stressFailureLimit || accumulatedDamage > damageFailureLimit)) {
       failureTime = time
       failureNodeIndex = nodes.reduce((bestIndex, node, index, list) => (node.stress > list[bestIndex].stress ? index : bestIndex), 0)
     }
