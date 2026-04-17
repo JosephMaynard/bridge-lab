@@ -4,7 +4,7 @@ import { defaultConfig, presets } from "@/features/bridge-sim/config"
 import { runSimulation } from "@/features/bridge-sim/engine"
 import type { CameraMatrices, SimulationConfig, SimulationRun } from "@/types/simulation"
 
-const CONTROL_PANEL_DEFAULT_OPEN = ["bridge", "load", "wind", "environment", "impact", "overlay"]
+const CONTROL_PANEL_DEFAULT_OPEN = ["bridge", "load", "wind", "environment", "impact", "dinosaur", "overlay"]
 const PREFERENCES_STORAGE_KEY = "bridge-lab:preferences"
 
 type SimulationState = {
@@ -38,6 +38,7 @@ const mergeConfig = (stored?: Partial<SimulationConfig>): SimulationConfig => ({
   wind: { ...defaultConfig.wind, ...stored?.wind },
   earthquake: { ...defaultConfig.earthquake, ...stored?.earthquake },
   impact: { ...defaultConfig.impact, ...stored?.impact },
+  dinosaur: { ...defaultConfig.dinosaur, ...stored?.dinosaur },
   environment: { ...defaultConfig.environment, ...stored?.environment },
   camera: { ...defaultConfig.camera, ...stored?.camera },
   overlay: { ...defaultConfig.overlay, ...stored?.overlay },

@@ -1,6 +1,6 @@
 import createPlotlyComponentModule from "react-plotly.js/factory"
 import Plotly from "plotly.js-basic-dist-min"
-import { Activity, BarChart3, GitCompare, Wind } from "lucide-react"
+import { Activity, BarChart3, PawPrint, Wind } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { bridgeTypeLabels } from "@/features/bridge-sim/config"
@@ -24,6 +24,7 @@ const chartColors = {
   wind: "#75a7ff",
   quake: "#e58b4c",
   impact: "#ff9f43",
+  dinosaur: "#8ee66f",
   load: "#9fd95a",
 }
 
@@ -124,6 +125,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
             <TabsTrigger value="wind">Wind</TabsTrigger>
             <TabsTrigger value="quake">Earthquake</TabsTrigger>
             <TabsTrigger value="impact">Impact</TabsTrigger>
+            <TabsTrigger value="dinosaur">Dinosaur</TabsTrigger>
             <TabsTrigger value="load">Load</TabsTrigger>
             <TabsTrigger value="compare">Compare</TabsTrigger>
           </TabsList>
@@ -180,6 +182,16 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
               layout={baseLayout("Meteor impact force vs damage", currentTime)}
             />
           </TabsContent>
+          <TabsContent value="dinosaur">
+            <PlotPanel
+              data={[
+                { x: time, y: frames.map((frame) => frame.dinosaurForce), type: "scatter", mode: "lines", name: "Bite force", line: { color: chartColors.dinosaur, width: 3 } },
+                { x: time, y: frames.map((frame) => Math.abs(frame.lateralSway)), type: "scatter", mode: "lines", name: "Deck side movement", line: { color: chartColors.sway, width: 2 } },
+                { x: time, y: frames.map((frame) => frame.damage), type: "scatter", mode: "lines", name: "Accumulated damage", line: { color: chartColors.stress, width: 3 } },
+              ]}
+              layout={baseLayout("T-Rex bite force vs bridge response", currentTime)}
+            />
+          </TabsContent>
           <TabsContent value="load">
             <PlotPanel
               data={[
@@ -202,7 +214,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
             <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
               <span className="flex items-center gap-2"><Activity className="size-3.5 text-red-400" /> Stress is normalized against material strength.</span>
               <span className="flex items-center gap-2"><Wind className="size-3.5 text-blue-400" /> Wind data uses replay frames.</span>
-              <span className="flex items-center gap-2"><GitCompare className="size-3.5 text-lime-400" /> Run other presets to compare designs.</span>
+              <span className="flex items-center gap-2"><PawPrint className="size-3.5 text-lime-400" /> Dinosaur attack is replay-frame data.</span>
             </div>
           </TabsContent>
         </Tabs>

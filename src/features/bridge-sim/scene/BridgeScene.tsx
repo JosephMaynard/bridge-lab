@@ -1,7 +1,8 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { Environment, Line, OrbitControls, PerspectiveCamera, Sky, Stars } from "@react-three/drei"
-import { useMemo, useRef } from "react"
+import { Environment, Line, OrbitControls, PerspectiveCamera, Sky, Stars, useAnimations, useGLTF } from "@react-three/drei"
+import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
+import trexUrl from "@/assets/T-Rex.glb?url"
 import { useSimulationStore } from "@/store/simulation-store"
 import type { BridgeNodeFrame, CameraMatrices, SimulationConfig, SimulationFrame, TimeOfDay } from "@/types/simulation"
 
@@ -593,6 +594,89 @@ function LoadTruck({ config, frame, failureProgress }: { config: SimulationConfi
   )
 }
 
+function DinosaurAttack({ config, frame }: { config: SimulationConfig; frame?: SimulationFrame }) {
+  const group = useRef<THREE.Group>(null)
+  const gltf = useGLTF(trexUrl)
+  const { actions, mixer } = useAnimations(gltf.animations, group)
+  const enabled = config.dinosaur.enabled && config.dinosaur.showEffects
+
+  useEffect(() => {
+    const attack = actions["Armature|TRex_Attack"] ?? Object.values(actions)[0]
+    if (!attack) return undefined
+    if (!enabled) {
+      attack.stop()
+      return undefined
+    }
+    attack.reset().play()
+    attack.paused = true
+    return () => {
+      attack.stop()
+    }
+  }, [actions, enabled])
+
+  useFrame(() => {
+    if (!group.current || !enabled) return
+    const timelineTime = frame?.time ?? 0
+    const activeTime = Math.max(0, timelineTime - config.dinosaur.attackTime)
+    const cycle = (activeTime * config.dinosaur.biteFrequency) % 1
+    const bitePulse = activeTime > 0 ? Math.exp(-Math.pow((cycle - 0.18) / 0.12, 2)) : 0
+    const lunge = bitePulse * 0.28
+    const sideDirection = config.dinosaur.side === "near" ? -1 : 1
+    const attack = actions["Armature|TRex_Attack"] ?? Object.values(actions)[0]
+    if (attack) {
+      attack.paused = true
+      attack.time = activeTime > 0 ? activeTime % attack.getClip().duration : 0
+      mixer.update(0)
+    }
+    group.current.position.z = sideDirection * (config.bridge.deckWidth / 2 + 5.6 - lunge)
+    group.current.position.y = -4.18 + Math.sin(timelineTime * 1.8) * 0.08
+  })
+
+  if (!enabled) return null
+
+  const sideDirection = config.dinosaur.side === "near" ? -1 : 1
+  const x = (frame?.dinosaurX ?? config.dinosaur.targetBias * config.bridge.spanLength * 0.48)
+  const biteForce = frame?.dinosaurForce ?? 0
+  const modelScale = config.dinosaur.scale * 0.1
+  const bitePosition: [number, number, number] = [x, 0.45, sideDirection * (config.bridge.deckWidth / 2 + 0.28)]
+
+  return (
+    <group>
+      <primitive
+        ref={group}
+        object={gltf.scene}
+        position={[x, -4.18, sideDirection * (config.bridge.deckWidth / 2 + 5.6)]}
+        rotation={[0, sideDirection < 0 ? 0 : Math.PI, 0]}
+        scale={modelScale}
+      />
+      {biteForce > 0.04 && (
+        <>
+          <mesh position={bitePosition}>
+            <sphereGeometry args={[0.34 + biteForce * 0.2, 18, 10]} />
+            <meshBasicMaterial color="#ffdd73" transparent opacity={Math.min(0.45, biteForce * 0.35)} blending={THREE.AdditiveBlending} depthWrite={false} />
+          </mesh>
+          <Line
+            points={[
+              [x - 0.9, 0.84, bitePosition[2]],
+              [x - 0.36, 0.18, bitePosition[2] - sideDirection * 0.24],
+              [x + 0.08, 0.78, bitePosition[2]],
+              [x + 0.56, 0.14, bitePosition[2] - sideDirection * 0.22],
+              [x + 1.04, 0.66, bitePosition[2]],
+            ]}
+            color="#f7e6a7"
+            lineWidth={2.2}
+            transparent
+            opacity={Math.min(0.85, biteForce * 0.65)}
+          />
+          <pointLight position={bitePosition} color="#ffce6e" intensity={biteForce * 12} distance={7} />
+        </>
+      )}
+    </group>
+  )
+}
+
+useGLTF.preload(trexUrl)
+
 function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: SimulationFrame }) {
   const threshold = config.bridge.failureThreshold * config.bridge.materialStrength
   const nodes = frame?.nodes
@@ -753,6 +837,7 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
         return <SupportPier key={`support-${node.id}`} node={node} color={stressColor(frame.supportStress[index] ?? node.stress, threshold)} />
       })}
       <LoadTruck config={config} frame={frame} failureProgress={failureProgress} />
+      <DinosaurAttack config={config} frame={frame} />
       {frame.failureNodeIndex !== undefined && config.overlay.showFailureZones && !frame.isStanding && (
         <mesh position={[nodes[frame.failureNodeIndex].x, nodes[frame.failureNodeIndex].y + 1.1, nodes[frame.failureNodeIndex].z]}>
           <sphereGeometry args={[1.1, 24, 16]} />
@@ -797,6 +882,9 @@ function IdleBridge({ config }: { config: SimulationConfig }) {
     earthquakeForce: 0,
     impactForce: 0,
     impactX: config.impact.targetBias * config.bridge.spanLength * 0.48,
+    dinosaurForce: 0,
+    dinosaurX: config.dinosaur.targetBias * config.bridge.spanLength * 0.48,
+    dinosaurSide: config.dinosaur.side,
     loadProfile: nodes.map(() => 0.12),
     damage: 0,
   }

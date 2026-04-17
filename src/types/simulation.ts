@@ -4,6 +4,7 @@ export type QuakeDirection = "vertical" | "lateral" | "mixed"
 export type QuakeWaveform = "sine" | "pulse" | "saw"
 export type StressPalette = "thermal" | "viridis" | "critical"
 export type TimeOfDay = "dawn" | "day" | "golden" | "sunset" | "night"
+export type DinosaurSide = "near" | "far"
 
 export type BridgeConfig = {
   type: BridgeType
@@ -68,6 +69,17 @@ export type ImpactConfig = {
   showEffects: boolean
 }
 
+export type DinosaurConfig = {
+  enabled: boolean
+  attackTime: number
+  intensity: number
+  targetBias: number
+  side: DinosaurSide
+  scale: number
+  biteFrequency: number
+  showEffects: boolean
+}
+
 export type EnvironmentConfig = {
   timeOfDay: TimeOfDay
 }
@@ -95,6 +107,7 @@ export type SimulationConfig = {
   wind: WindConfig
   earthquake: EarthquakeConfig
   impact: ImpactConfig
+  dinosaur: DinosaurConfig
   environment: EnvironmentConfig
   camera: CameraConfig
   overlay: OverlayConfig
@@ -129,6 +142,9 @@ export type SimulationFrame = {
   earthquakeForce: number
   impactForce: number
   impactX: number
+  dinosaurForce: number
+  dinosaurX: number
+  dinosaurSide: DinosaurSide
   loadProfile: number[]
   damage: number
 }

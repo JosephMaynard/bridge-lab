@@ -1,4 +1,4 @@
-import { CloudSun, Flame, Gauge, Layers, Mountain, Route, ShieldAlert, Wind } from "lucide-react"
+import { CloudSun, Flame, Gauge, Layers, Mountain, PawPrint, Route, ShieldAlert, Wind } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -8,7 +8,7 @@ import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { bridgeTypeLabels, presets, timeOfDayLabels } from "@/features/bridge-sim/config"
 import { useSimulationStore } from "@/store/simulation-store"
-import type { BridgeType, LoadDistributionMode, QuakeDirection, QuakeWaveform, StressPalette, TimeOfDay } from "@/types/simulation"
+import type { BridgeType, DinosaurSide, LoadDistributionMode, QuakeDirection, QuakeWaveform, StressPalette, TimeOfDay } from "@/types/simulation"
 
 type SliderRowProps = {
   label: string
@@ -223,6 +223,34 @@ export function ControlPanel() {
               <SliderRow label="Fragment count" value={config.impact.fragmentCount} min={24} max={420} step={4} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, fragmentCount: value } }))} />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Impact force is applied around the target point during the simulation, then replayed with a meteor trail, flash, shockwave, and fragment spray.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="dinosaur">
+            <AccordionTrigger><span className="flex items-center gap-2"><PawPrint className="size-4 text-emerald-500" /> Giant Dinosaur</span></AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <SwitchRow label="T-Rex attack enabled" checked={config.dinosaur.enabled} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, enabled: checked } }))} />
+              <SwitchRow label="Show dinosaur" checked={config.dinosaur.showEffects} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, showEffects: checked } }))} />
+              <SliderRow label="Attack time" value={config.dinosaur.attackTime} min={0} max={config.timing.duration} step={0.1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, attackTime: value } }))} />
+              <SliderRow label="Bite intensity" value={config.dinosaur.intensity} min={0.1} max={1.8} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, intensity: value } }))} />
+              <SliderRow label="Bite position" value={config.dinosaur.targetBias} min={-0.75} max={0.75} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, targetBias: value } }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Attack side</Label>
+                  <Select value={config.dinosaur.side} onValueChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, side: value as DinosaurSide } }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="near">Near side</SelectItem>
+                      <SelectItem value="far">Far side</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <SliderRow label="Scale" value={config.dinosaur.scale} min={3.2} max={8} step={0.1} onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, scale: value } }))} />
+              </div>
+              <SliderRow label="Bite frequency" value={config.dinosaur.biteFrequency} min={0.35} max={2.4} step={0.05} unit="Hz" onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, biteFrequency: value } }))} />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                The T-Rex applies pulsed lateral and downward force near the bite point, using the same replay data that drives the bridge deformation.
               </p>
             </AccordionContent>
           </AccordionItem>

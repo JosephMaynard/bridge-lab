@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Flame, Gauge, Timer, Waves, Wind } from "lucide-react"
+import { Activity, AlertTriangle, Flame, Gauge, PawPrint, Timer, Waves, Wind } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { useSimulationStore } from "@/store/simulation-store"
 
@@ -10,13 +10,14 @@ export function StatusHud() {
   const frame = run?.frames[replayIndex]
 
   return (
-    <div className="pointer-events-none absolute left-4 top-4 z-30 grid w-[min(800px,calc(100%-2rem))] gap-2 sm:grid-cols-3 xl:grid-cols-7">
+    <div className="pointer-events-none absolute left-4 top-4 z-30 grid w-[min(920px,calc(100%-2rem))] gap-2 sm:grid-cols-3 xl:grid-cols-8">
       <Metric icon={<Activity className="size-4" />} label="State" value={run ? (frame?.isStanding ? "Standing" : "Failed") : "Ready"} tone={frame && !frame.isStanding ? "danger" : "good"} />
       <Metric icon={<Gauge className="size-4" />} label="Max stress" value={format(frame?.maxStress)} />
       <Metric icon={<Waves className="size-4" />} label="Centre sway" value={`${format(frame?.centreDisplacement)}m`} />
       <Metric icon={<Wind className="size-4" />} label="Wind" value={`${format(frame?.windSpeed, 1)}kt`} />
       <Metric icon={<AlertTriangle className="size-4" />} label="Quake" value={format(frame ? Math.abs(frame.earthquakeForce) : undefined)} />
       <Metric icon={<Flame className="size-4" />} label="Impact" value={format(frame?.impactForce)} tone={frame && frame.impactForce > 0.2 ? "danger" : undefined} />
+      <Metric icon={<PawPrint className="size-4" />} label="Dino" value={format(frame?.dinosaurForce)} tone={frame && frame.dinosaurForce > 0.2 ? "danger" : undefined} />
       <Metric icon={<Timer className="size-4" />} label="Time" value={`${format(frame?.time, 1)}s`} />
     </div>
   )
