@@ -75,7 +75,7 @@ export function AppShell() {
           <div className="flex items-center gap-2">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="icon-sm" className="lg:hidden"><Menu className="size-4" /></Button>
+                <Button variant="outline" size="icon-sm" className="lg:hidden" aria-label="Open simulation controls"><Menu className="size-4" /></Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[88vw] p-0 sm:max-w-md">
                 <SheetHeader>

@@ -16,6 +16,7 @@ type SimulationState = {
   isPlaying: boolean
   cameraMatrices?: CameraMatrices
   updateConfig: (updater: (config: SimulationConfig) => SimulationConfig) => void
+  setReplaySpeed: (speed: number) => void
   loadPreset: (presetId: string) => void
   setControlPanelOpen: (openItems: string[]) => void
   run: () => void
@@ -52,10 +53,11 @@ export const useSimulationStore = create<SimulationState>()(
       controlPanelOpen: CONTROL_PANEL_DEFAULT_OPEN,
       replayIndex: 0,
       isPlaying: false,
-      updateConfig: (updater) => set((state) => ({ config: updater(cloneConfig(state.config)) })),
+      updateConfig: (updater) => set((state) => ({ config: updater(cloneConfig(state.config)), currentRun: undefined, replayIndex: 0, isPlaying: false })),
+      setReplaySpeed: (speed) => set((state) => ({ config: { ...state.config, timing: { ...state.config.timing, replaySpeed: speed } } })),
       loadPreset: (presetId) => {
         const preset = presets.find((candidate) => candidate.id === presetId)
-        if (preset) set({ config: cloneConfig(preset.config) })
+        if (preset) set({ config: cloneConfig(preset.config), currentRun: undefined, replayIndex: 0, isPlaying: false })
       },
       setControlPanelOpen: (controlPanelOpen) => set({ controlPanelOpen }),
       run: () => {

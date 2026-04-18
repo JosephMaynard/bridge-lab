@@ -27,7 +27,7 @@ function SliderRow({ label, value, min, max, step, unit = "", onChange }: Slider
         <Label className="text-xs text-muted-foreground">{label}</Label>
         <span className="font-mono text-xs text-foreground">{value.toFixed(step >= 1 ? 0 : 2)}{unit}</span>
       </div>
-      <Slider value={[value]} min={min} max={max} step={step} onValueChange={(next) => onChange(next[0] ?? value)} />
+      <Slider aria-label={label} value={[value]} min={min} max={max} step={step} onValueChange={(next) => onChange(next[0] ?? value)} />
     </div>
   )
 }
@@ -36,7 +36,7 @@ function SwitchRow({ label, checked, onCheckedChange }: { label: string; checked
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-background/45 p-3">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch aria-label={label} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }
@@ -53,6 +53,7 @@ function TimeOfDaySlider({ value, onChange }: { value: TimeOfDay; onChange: (val
         <span className="text-xs font-medium text-foreground">{timeOfDayLabels[value]}</span>
       </div>
       <Slider
+        aria-label="Time of day"
         value={[currentIndex]}
         min={0}
         max={timeOfDayOptions.length - 1}
@@ -73,6 +74,7 @@ function TimeOfDaySlider({ value, onChange }: { value: TimeOfDay; onChange: (val
 export function ControlPanel() {
   const config = useSimulationStore((state) => state.config)
   const updateConfig = useSimulationStore((state) => state.updateConfig)
+  const setReplaySpeed = useSimulationStore((state) => state.setReplaySpeed)
   const loadPreset = useSimulationStore((state) => state.loadPreset)
   const controlPanelOpen = useSimulationStore((state) => state.controlPanelOpen)
   const setControlPanelOpen = useSimulationStore((state) => state.setControlPanelOpen)
@@ -214,7 +216,7 @@ export function ControlPanel() {
             <AccordionContent className="space-y-4">
               <SwitchRow label="Meteor impact enabled" checked={config.impact.enabled} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, enabled: checked } }))} />
               <SwitchRow label="Show impact effects" checked={config.impact.showEffects} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, showEffects: checked } }))} />
-              <SliderRow label="Impact time" value={config.impact.impactTime} min={0.8} max={config.timing.duration} step={0.1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, impactTime: value } }))} />
+              <SliderRow label="Impact time" value={config.impact.impactTime} min={0.8} max={config.timing.duration} step={0.1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, impactTime: Math.min(value, draft.timing.duration) } }))} />
               <SliderRow label="Impact intensity" value={config.impact.intensity} min={0.1} max={1.8} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, intensity: value } }))} />
               <SliderRow label="Blast radius" value={config.impact.radius} min={0.08} max={0.55} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, radius: value } }))} />
               <SliderRow label="Entry speed" value={config.impact.speed} min={24} max={120} step={1} unit="km/s" onChange={(value) => updateConfig((draft) => ({ ...draft, impact: { ...draft.impact, speed: value } }))} />
@@ -232,7 +234,7 @@ export function ControlPanel() {
             <AccordionContent className="space-y-4">
               <SwitchRow label="T-Rex attack enabled" checked={config.dinosaur.enabled} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, enabled: checked } }))} />
               <SwitchRow label="Show dinosaur" checked={config.dinosaur.showEffects} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, showEffects: checked } }))} />
-              <SliderRow label="Attack time" value={config.dinosaur.attackTime} min={0} max={config.timing.duration} step={0.1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, attackTime: value } }))} />
+              <SliderRow label="Attack time" value={config.dinosaur.attackTime} min={0} max={config.timing.duration} step={0.1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, attackTime: Math.min(value, draft.timing.duration) } }))} />
               <SliderRow label="Bite intensity" value={config.dinosaur.intensity} min={0.1} max={1.8} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, intensity: value } }))} />
               <SliderRow label="Bite position" value={config.dinosaur.targetBias} min={-0.75} max={0.75} step={0.01} onChange={(value) => updateConfig((draft) => ({ ...draft, dinosaur: { ...draft.dinosaur, targetBias: value } }))} />
               <div className="grid grid-cols-2 gap-3">
@@ -285,9 +287,9 @@ export function ControlPanel() {
               <SwitchRow label="Show support labels" checked={config.overlay.showSupportLabels} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, overlay: { ...draft.overlay, showSupportLabels: checked } }))} />
               <SwitchRow label="Show failure zones" checked={config.overlay.showFailureZones} onCheckedChange={(checked) => updateConfig((draft) => ({ ...draft, overlay: { ...draft.overlay, showFailureZones: checked } }))} />
               <Separator />
-              <SliderRow label="Duration" value={config.timing.duration} min={6} max={30} step={1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, timing: { ...draft.timing, duration: value } }))} />
+              <SliderRow label="Duration" value={config.timing.duration} min={6} max={30} step={1} unit="s" onChange={(value) => updateConfig((draft) => ({ ...draft, timing: { ...draft.timing, duration: value }, impact: { ...draft.impact, impactTime: Math.min(draft.impact.impactTime, value) }, dinosaur: { ...draft.dinosaur, attackTime: Math.min(draft.dinosaur.attackTime, value) } }))} />
               <SliderRow label="Sample density" value={config.timing.sampleDensity} min={12} max={60} step={1} unit="fps" onChange={(value) => updateConfig((draft) => ({ ...draft, timing: { ...draft.timing, sampleDensity: value } }))} />
-              <SliderRow label="Replay speed" value={config.timing.replaySpeed} min={0.25} max={3} step={0.05} unit="x" onChange={(value) => updateConfig((draft) => ({ ...draft, timing: { ...draft.timing, replaySpeed: value } }))} />
+              <SliderRow label="Replay speed" value={config.timing.replaySpeed} min={0.25} max={3} step={0.05} unit="x" onChange={setReplaySpeed} />
             </AccordionContent>
           </AccordionItem>
         </Accordion>

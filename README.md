@@ -67,6 +67,7 @@ Adjust presets in `src/features/bridge-sim/config.ts`. The exported `presets` ar
 - Earthquake Failure
 - Heavy Load
 - Meteor Strike
+- T-Rex Attack
 - Extreme Chaos
 
 Add or tune controls by extending `SimulationConfig` in `src/types/simulation.ts`, updating defaults/presets in `config.ts`, and wiring UI bindings in `src/components/simulation/ControlPanel.tsx`.

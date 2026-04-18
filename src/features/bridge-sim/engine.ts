@@ -121,9 +121,9 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     const windBase = config.wind.enabled ? config.wind.speed : 0
     const windNoise = seededNoise(frameIndex * 0.37 + config.wind.direction * 0.03) - 0.5
     const windSpeed = Math.max(0, windBase * (1 + config.wind.gustiness * Math.sin(gustPhase) + config.wind.turbulence * 0.34 * windNoise))
-    const quakeActive = config.earthquake.enabled && time <= config.earthquake.duration
+    const quakeActive = config.earthquake.enabled && config.earthquake.duration > 0 && time <= config.earthquake.duration
     const quakeEnvelope = quakeActive ? Math.sin(Math.PI * clamp(time / config.earthquake.duration, 0, 1)) : 0
-    const quakeWave = waveformValue(config.earthquake.waveform, time * config.earthquake.frequency * Math.PI * 2)
+    const quakeWave = quakeActive ? waveformValue(config.earthquake.waveform, time * config.earthquake.frequency * Math.PI * 2) : 0
     const earthquakeForce = quakeActive ? config.earthquake.intensity * quakeEnvelope * quakeWave : 0
     const impactPulse = impactPulseFor(time, config)
     const impactEnergy = config.impact.enabled ? impactPulse * config.impact.intensity * (0.55 + config.impact.speed / 82) : 0
@@ -200,7 +200,11 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
 
     const beforeMeteorStrike = config.impact.enabled && time < config.impact.impactTime
     const beforeDinosaurAttack = config.dinosaur.enabled && time < config.dinosaur.attackTime
-    const stressFailureLimit = beforeMeteorStrike || beforeDinosaurAttack ? threshold * (1.48 + config.impact.intensity * 0.18 + config.dinosaur.intensity * 0.08) : threshold
+    const preEventMultiplier =
+      1.48 +
+      (beforeMeteorStrike ? config.impact.intensity * 0.18 : 0) +
+      (beforeDinosaurAttack ? config.dinosaur.intensity * 0.08 : 0)
+    const stressFailureLimit = beforeMeteorStrike || beforeDinosaurAttack ? threshold * preEventMultiplier : threshold
     const damageFailureLimit = beforeMeteorStrike || beforeDinosaurAttack ? 0.98 : 0.82
 
     if (failureTime === undefined && (maxStress > stressFailureLimit || accumulatedDamage > damageFailureLimit)) {

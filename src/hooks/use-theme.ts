@@ -5,7 +5,9 @@ type Theme = "light" | "dark"
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("bridgelab-theme")
-    return saved === "light" ? "light" : "dark"
+    if (saved === "light" || saved === "dark") return saved
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches) return "light"
+    return "dark"
   })
 
   useEffect(() => {

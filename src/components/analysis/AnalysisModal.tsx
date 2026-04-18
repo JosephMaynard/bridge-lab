@@ -1,16 +1,31 @@
-import createPlotlyComponentModule from "react-plotly.js/factory"
-import Plotly from "plotly.js-basic-dist-min"
+import { useEffect, useState, type ComponentType } from "react"
 import { Activity, BarChart3, PawPrint, Wind } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { bridgeTypeLabels } from "@/features/bridge-sim/config"
 import { useSimulationStore } from "@/store/simulation-store"
 import type { SimulationRun } from "@/types/simulation"
+import type { PlotParams } from "react-plotly.js"
 
-const createPlotlyComponent = (
-  (createPlotlyComponentModule as unknown as { default?: typeof createPlotlyComponentModule }).default ?? createPlotlyComponentModule
-) as typeof createPlotlyComponentModule
-const Plot = createPlotlyComponent(Plotly)
+type PlotComponent = ComponentType<PlotParams>
+type PlotlyFactory = typeof import("react-plotly.js/factory").default
+
+let plotComponentPromise: Promise<PlotComponent> | undefined
+
+const loadPlotComponent = () => {
+  plotComponentPromise ??= Promise.all([
+    import("plotly.js-basic-dist-min"),
+    import("react-plotly.js/factory"),
+  ]).then(([plotlyModule, factoryModule]) => {
+    const createPlotlyComponent = (
+      (factoryModule as unknown as { default?: PlotlyFactory }).default ?? factoryModule
+    ) as PlotlyFactory
+    const plotly = ((plotlyModule as unknown as { default?: object }).default ?? plotlyModule) as object
+    return createPlotlyComponent(plotly)
+  })
+
+  return plotComponentPromise
+}
 
 type AnalysisModalProps = {
   open: boolean
@@ -28,7 +43,7 @@ const chartColors = {
   load: "#9fd95a",
 }
 
-const baseLayout = (title: string, currentTime?: number): Partial<Plotly.Layout> => ({
+const baseLayout = (title: string, currentTime?: number): PlotParams["layout"] => ({
   title: { text: title, font: { size: 15, color: "currentColor" } },
   autosize: true,
   margin: { l: 48, r: 24, t: 52, b: 44 },
@@ -55,7 +70,7 @@ const baseLayout = (title: string, currentTime?: number): Partial<Plotly.Layout>
   legend: { orientation: "h", y: -0.2 },
 })
 
-const plotConfig = {
+const plotConfig: PlotParams["config"] = {
   responsive: true,
   displayModeBar: false,
 }
@@ -68,7 +83,17 @@ function EmptyState() {
   )
 }
 
-function PlotPanel({ data, layout }: { data: Plotly.Data[]; layout: Partial<Plotly.Layout> }) {
+function PlotLoadingState() {
+  return (
+    <div className="grid h-[430px] place-items-center rounded-md border border-border/70 bg-background/60 text-sm text-muted-foreground">
+      Loading analysis charts...
+    </div>
+  )
+}
+
+function PlotPanel({ data, layout, Plot }: { data: PlotParams["data"]; layout: PlotParams["layout"]; Plot?: PlotComponent }) {
+  if (!Plot) return <PlotLoadingState />
+
   return (
     <div className="h-[430px] min-h-0 rounded-md border border-border/70 bg-background/60 p-2">
       <Plot data={data} layout={layout} config={plotConfig} useResizeHandler className="h-full w-full" />
@@ -82,6 +107,18 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
   const run = useSimulationStore((state) => state.currentRun)
   const recentRuns = useSimulationStore((state) => state.recentRuns)
   const replayIndex = useSimulationStore((state) => state.replayIndex)
+  const [Plot, setPlot] = useState<PlotComponent>()
+
+  useEffect(() => {
+    if (!open) return undefined
+    let cancelled = false
+    loadPlotComponent().then((component) => {
+      if (!cancelled) setPlot(() => component)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   if (!run) {
     return (
@@ -131,6 +168,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsList>
           <TabsContent value="stress">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: time, y: frames.map((frame) => frame.maxStress), type: "scatter", mode: "lines", name: "Max stress", line: { color: chartColors.stress, width: 3 } },
                 { x: [time[0], time[time.length - 1]], y: [threshold, threshold], type: "scatter", mode: "lines", name: "Failure threshold", line: { color: chartColors.threshold, width: 2, dash: "dash" } },
@@ -140,6 +178,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="motion">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: time, y: frames.map((frame) => frame.centreDisplacement), type: "scatter", mode: "lines", name: "Centre displacement", line: { color: chartColors.sway, width: 3 } },
                 { x: time, y: frames.map((frame) => frame.lateralSway), type: "scatter", mode: "lines", name: "Lateral sway", line: { color: chartColors.wind, width: 2 } },
@@ -149,6 +188,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="supports">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: peakSupport.map((_, index) => `S${index + 1}`), y: peakSupport, type: "bar", name: "Peak support stress", marker: { color: peakSupport.map((value) => (value > threshold ? chartColors.stress : chartColors.sway)) } },
               ]}
@@ -157,6 +197,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="wind">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: frames.map((frame) => frame.windSpeed), y: frames.map((frame) => Math.abs(frame.lateralSway)), type: "scatter", mode: "markers", name: "Wind vs sway", marker: { color: chartColors.wind, size: 6, opacity: 0.72 } },
                 { x: time, y: frames.map((frame) => frame.windSpeed / 20), type: "scatter", mode: "lines", name: "Scaled wind trace", line: { color: chartColors.sway, width: 2 } },
@@ -166,6 +207,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="quake">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: time, y: frames.map((frame) => Math.abs(frame.earthquakeForce)), type: "scatter", mode: "lines", name: "Quake contribution", line: { color: chartColors.quake, width: 3 } },
                 { x: time, y: frames.map((frame) => frame.damage), type: "scatter", mode: "lines", name: "Accumulated damage", line: { color: chartColors.stress, width: 3 } },
@@ -175,6 +217,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="impact">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: time, y: frames.map((frame) => frame.impactForce), type: "scatter", mode: "lines", name: "Meteor impact force", line: { color: chartColors.impact, width: 3 } },
                 { x: time, y: frames.map((frame) => frame.damage), type: "scatter", mode: "lines", name: "Accumulated damage", line: { color: chartColors.stress, width: 3 } },
@@ -184,6 +227,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="dinosaur">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: time, y: frames.map((frame) => frame.dinosaurForce), type: "scatter", mode: "lines", name: "Bite force", line: { color: chartColors.dinosaur, width: 3 } },
                 { x: time, y: frames.map((frame) => Math.abs(frame.lateralSway)), type: "scatter", mode: "lines", name: "Deck side movement", line: { color: chartColors.sway, width: 2 } },
@@ -194,6 +238,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="load">
             <PlotPanel
+              Plot={Plot}
               data={[
                 { x: peakSegment.map((_, index) => index + 1), y: peakSegment, type: "scatter", mode: "lines+markers", name: "Peak segment stress", line: { color: chartColors.load, width: 3 } },
                 { x: run.frames[replayIndex]?.loadProfile.map((_, index) => index + 1), y: run.frames[replayIndex]?.loadProfile, type: "scatter", mode: "lines", name: "Current load profile", line: { color: chartColors.threshold, width: 2 } },
@@ -203,6 +248,7 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
           </TabsContent>
           <TabsContent value="compare">
             <PlotPanel
+              Plot={Plot}
               data={comparisonRuns.map((item) => ({
                 x: ["Peak stress", "Peak displacement", "Peak sway"],
                 y: [item.peakStress, item.peakDisplacement, item.peakSway],
