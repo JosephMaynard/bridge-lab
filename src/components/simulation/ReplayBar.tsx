@@ -14,10 +14,11 @@ export function ReplayBar() {
   const setReplaySpeed = useSimulationStore((state) => state.setReplaySpeed)
   const speed = useSimulationStore((state) => state.config.timing.replaySpeed)
 
-  if (!run) return null
+  if (!run || run.frames.length === 0) return null
 
-  const frame = run.frames[replayIndex]
   const maxIndex = run.frames.length - 1
+  const safeReplayIndex = Math.min(maxIndex, Math.max(0, replayIndex))
+  const frame = run.frames[safeReplayIndex]
   const failureIndex = run.failureTime !== undefined ? run.frames.findIndex((candidate) => candidate.time >= run.failureTime!) : undefined
 
   return (
@@ -47,7 +48,7 @@ export function ReplayBar() {
             <span>{frame.time.toFixed(2)}s</span>
             <span>{run.failed ? `Failure ${run.failureTime?.toFixed(2)}s` : "Bridge held"}</span>
           </div>
-          <Slider aria-label="Replay position" value={[replayIndex]} min={0} max={maxIndex} step={1} onValueChange={(next) => setReplayIndex(next[0] ?? 0)} />
+          <Slider aria-label="Replay position" value={[safeReplayIndex]} min={0} max={maxIndex} step={1} onValueChange={(next) => setReplayIndex(next[0] ?? 0)} />
         </div>
         <div className="flex min-w-48 items-center gap-3">
           <span className="w-14 text-xs text-white/68">{speed.toFixed(2)}x</span>

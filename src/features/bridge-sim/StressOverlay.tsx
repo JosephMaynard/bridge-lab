@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
 import vtkDataArray from "vtk.js/Sources/Common/Core/DataArray"
 import vtkPoints from "vtk.js/Sources/Common/Core/Points"
@@ -58,12 +58,26 @@ const buildVtkStressDataset = (frame: SimulationFrame) => {
 
 export function StressOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [highlightTick, setHighlightTick] = useState(0)
   const config = useSimulationStore((state) => state.config)
   const run = useSimulationStore((state) => state.currentRun)
   const replayIndex = useSimulationStore((state) => state.replayIndex)
   const cameraMatrices = useSimulationStore((state) => state.cameraMatrices)
   const frame = run ? getLastIntactFrame(run, replayIndex) : undefined
   const vtkDataset = useMemo(() => (frame ? buildVtkStressDataset(frame) : undefined), [frame])
+
+  useEffect(() => {
+    if (!config.overlay.highlightCritical || !config.overlay.showStress) return undefined
+
+    let animation = 0
+    const tick = () => {
+      setHighlightTick(performance.now())
+      animation = requestAnimationFrame(tick)
+    }
+
+    animation = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(animation)
+  }, [config.overlay.highlightCritical, config.overlay.showStress])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -125,7 +139,7 @@ export function StressOverlay() {
       context.globalAlpha = Math.min(1, config.overlay.opacity + 0.18)
       context.fillStyle = colorFor(node.stress, threshold, config)
       context.beginPath()
-      context.arc(point.x, point.y, 9 + Math.sin(performance.now() * 0.006) * 2, 0, Math.PI * 2)
+      context.arc(point.x, point.y, 9 + Math.sin(highlightTick * 0.006) * 2, 0, Math.PI * 2)
       context.fill()
     }
 
@@ -148,7 +162,7 @@ export function StressOverlay() {
     const message = run.failed && !run.frames[replayIndex]?.isStanding ? "VTK overlay frozen at last intact frame" : `VTK scalar range ${scalarRange[0].toFixed(2)}-${scalarRange[1].toFixed(2)}`
     context.fillText(message, 18, 28)
     context.restore()
-  }, [cameraMatrices, config, frame, replayIndex, run, vtkDataset])
+  }, [cameraMatrices, config, frame, highlightTick, replayIndex, run, vtkDataset])
 
   return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-20 mix-blend-screen" aria-hidden="true" />
 }

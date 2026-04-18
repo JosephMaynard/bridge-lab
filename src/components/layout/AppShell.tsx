@@ -23,6 +23,7 @@ function useReplayClock() {
   const accumulator = useRef(0)
 
   useEffect(() => {
+    accumulator.current = 0
     let animation = 0
     let previous = performance.now()
 

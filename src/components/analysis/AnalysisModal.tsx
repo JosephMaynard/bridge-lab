@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react"
+import { useEffect, useMemo, useState, type ComponentType } from "react"
 import { Activity, BarChart3, PawPrint, Wind } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -102,12 +102,22 @@ function PlotPanel({ data, layout, Plot }: { data: PlotParams["data"]; layout: P
 }
 
 const getCurrentTime = (run: SimulationRun | undefined, replayIndex: number) => run?.frames[replayIndex]?.time
+const emptyFrames: SimulationRun["frames"] = []
 
 export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
   const run = useSimulationStore((state) => state.currentRun)
   const recentRuns = useSimulationStore((state) => state.recentRuns)
   const replayIndex = useSimulationStore((state) => state.replayIndex)
   const [Plot, setPlot] = useState<PlotComponent>()
+  const frames = run?.frames ?? emptyFrames
+  const peakSupport = useMemo(
+    () => frames[frames.length - 1]?.supportStress.map((_, index) => Math.max(...frames.map((frame) => frame.supportStress[index] ?? 0))) ?? [],
+    [frames],
+  )
+  const peakSegment = useMemo(
+    () => frames[frames.length - 1]?.segmentStress.map((_, index) => Math.max(...frames.map((frame) => frame.segmentStress[index] ?? 0))) ?? [],
+    [frames],
+  )
 
   useEffect(() => {
     if (!open) return undefined
@@ -134,12 +144,9 @@ export function AnalysisModal({ open, onOpenChange }: AnalysisModalProps) {
     )
   }
 
-  const frames = run.frames
   const time = frames.map((frame) => frame.time)
   const threshold = run.config.bridge.failureThreshold * run.config.bridge.materialStrength
   const currentTime = getCurrentTime(run, replayIndex)
-  const peakSupport = run.frames[run.frames.length - 1]?.supportStress.map((_, index) => Math.max(...frames.map((frame) => frame.supportStress[index] ?? 0))) ?? []
-  const peakSegment = run.frames[run.frames.length - 1]?.segmentStress.map((_, index) => Math.max(...frames.map((frame) => frame.segmentStress[index] ?? 0))) ?? []
   const comparisonRuns = recentRuns.length > 1 ? recentRuns.slice(0, 5) : [run]
 
   return (

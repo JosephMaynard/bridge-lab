@@ -1,6 +1,6 @@
 # BridgeLab
 
-BridgeLab is a single page React + TypeScript bridge simulation demo built with Vite, Tailwind CSS v4, shadcn/ui, React Three Fiber, vtk.js, Plotly, Lucide React, and Zustand.
+BridgeLab is a single-page React + TypeScript bridge simulation demo built with Vite, Tailwind CSS v4, shadcn/ui, React Three Fiber, vtk.js, Plotly, Lucide React, and Zustand.
 
 ## Run locally
 
