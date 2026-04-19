@@ -1,73 +1,85 @@
-# React + TypeScript + Vite
+# BridgeLab
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+BridgeLab is a single-page React + TypeScript bridge simulation demo built with Vite, Tailwind CSS v4, shadcn/ui, React Three Fiber, vtk.js, Plotly, Lucide React, and Zustand.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app runs at the Vite local URL, usually `http://localhost:5173/`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Project structure
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `src/components/layout/` contains the app shell, header, responsive layout, and replay clock.
+- `src/components/simulation/` contains the control panel, status HUD, and replay timeline.
+- `src/components/analysis/` contains the Plotly analysis dialog and chart tabs.
+- `src/components/ui/` contains shadcn/ui components copied into the project.
+- `src/features/bridge-sim/config.ts` contains defaults, presets, labels, and scenario configuration.
+- `src/features/bridge-sim/engine.ts` contains the deterministic simulation model and replay frame generation.
+- `src/features/bridge-sim/scene/` contains the React Three Fiber scene and procedural bridge rendering.
+- `src/features/bridge-sim/StressOverlay.tsx` contains the vtk.js scalar overlay canvas.
+- `src/store/simulation-store.ts` contains the Zustand state and public actions for configuration, run, reset, and replay.
+- `src/types/` contains the shared simulation, VTK, and Plotly types.
+
+## Simulation model
+
+The model is a deterministic, physics-inspired approximation rather than a full finite element solver. `runSimulation(config)` builds a bridge as a set of deck nodes and segment/support stress arrays, then samples a run into replay frames.
+
+Each frame stores:
+
+- node positions and displacements
+- segment stress
+- support stress
+- max stress
+- centre deck displacement
+- lateral sway
+- wind speed
+- earthquake force
+- load distribution
+- accumulated damage
+- failure metadata when thresholds are exceeded
+
+Stress is driven by load profile, wind gusts, earthquake waveform, bridge stiffness, damping, material strength, and bridge type. When max stress or accumulated damage crosses the configured threshold, the engine records a failure time and critical node. Later frames keep replaying the collapse deformation in the Three.js layer.
+
+Wind particles are a visualization of the same wind field used by the simulation: speed, gustiness, direction, and turbulence. They are not individual solver particles and do not add per-particle impact forces. The simulation reads the wind controls directly, while the renderer uses those same controls to draw directional particle heads and trail lines.
+
+Meteor impacts are simulation inputs and visual events. The engine applies a localized impact force around the configured target point using impact time, intensity, radius, speed, and entry angle. The renderer replays that same event with an incoming meteor, hot trail, impact flash, expanding shockwave, and deterministic fragment spray.
+
+## R3F and VTK overlay synchronisation
+
+React Three Fiber owns the main cinematic scene: bridge geometry, landmasses, water, particles, camera motion, manual orbit controls, and collapse animation.
+
+The scene atmosphere is driven by the `environment.timeOfDay` control. `BridgeScene.tsx` uses Drei `Sky`, `Environment`, and `Stars` to swap between Dawn, Day, Golden Hour, Sunset, and Night. Each mode changes sky tone, sun position, ambient and directional light, fog, water tint, stars, moonlight, and bridge lights as one coherent preset. The default Golden Hour mode intentionally stays close to the original dark cinematic look.
+
+The VTK overlay uses the same replay frame. `StressOverlay.tsx` converts the current intact bridge frame into a vtk.js `PolyData` scalar dataset, then draws stress-coloured bridge segments onto an absolutely positioned canvas over the R3F canvas. The R3F camera publishes projection and view matrices through Zustand, so the overlay projects the same 3D node positions into the same viewport.
+
+After failure, the overlay intentionally freezes on the last intact frame while the R3F layer continues showing the collapse. This keeps stress analysis readable without hiding the cinematic failure replay.
+
+## Presets and controls
+
+Adjust presets in `src/features/bridge-sim/config.ts`. The exported `presets` array includes:
+
+- Calm Conditions
+- Crosswind Stress Test
+- Earthquake Failure
+- Heavy Load
+- Meteor Strike
+- T-Rex Attack
+- Extreme Chaos
+
+Add or tune controls by extending `SimulationConfig` in `src/types/simulation.ts`, updating defaults/presets in `config.ts`, and wiring UI bindings in `src/components/simulation/ControlPanel.tsx`.
+
+Sky presets live in `src/features/bridge-sim/scene/BridgeScene.tsx` as `atmospherePresets`. Scenario defaults choose their time of day in `src/features/bridge-sim/config.ts`.
+
+Useful store actions are in `src/store/simulation-store.ts`:
+
+- `run()`
+- `reset()`
+- `setReplayIndex(index)`
+- `setReplayTime(time)`
+- `setPlaying(isPlaying)`
+- `loadPreset(presetId)`
+- `updateConfig(updater)`
