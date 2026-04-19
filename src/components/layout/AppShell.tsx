@@ -31,7 +31,9 @@ function useReplayClock() {
       const deltaSeconds = (now - previous) / 1000
       previous = now
       if (run && isPlaying) {
-        accumulator.current += deltaSeconds * speed * run.config.timing.sampleDensity
+        const MAX_DELTA = 0.1
+        const clampedDelta = Math.min(deltaSeconds, MAX_DELTA)
+        accumulator.current += clampedDelta * speed * run.config.timing.sampleDensity
         const steps = Math.floor(accumulator.current)
         if (steps > 0) {
           accumulator.current -= steps

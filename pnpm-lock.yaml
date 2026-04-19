@@ -72,12 +72,18 @@ importers:
       '@types/node':
         specifier: ^24.12.2
         version: 24.12.2
+      '@types/plotly.js':
+        specifier: ^3.0.10
+        version: 3.0.10
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.14)
+      '@types/three':
+        specifier: ^0.184.0
+        version: 0.184.0
       '@vitejs/plugin-react':
         specifier: ^6.0.1
         version: 6.0.1(vite@8.0.8(@types/node@24.12.2)(jiti@2.6.1))
@@ -1908,6 +1914,9 @@ packages:
 
   '@types/pbf@3.0.5':
     resolution: {integrity: sha512-j3pOPiEcWZ34R6a6mN07mUkM4o4Lwf6hPNt8eilOeZhTFbxFXmKhvXl9Y28jotFPaI1bpPDJsbCprUoNke6OrA==}
+
+  '@types/plotly.js@3.0.10':
+    resolution: {integrity: sha512-q+MgO4aajC2HrO7FllTYWzrpdfbTjboSMfjkz/aXKjg1v7HNo1zMEFfAW7quKfk6SL+bH74A5ThBEps/7hZxOA==}
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -6743,6 +6752,8 @@ snapshots:
   '@types/offscreencanvas@2019.7.3': {}
 
   '@types/pbf@3.0.5': {}
+
+  '@types/plotly.js@3.0.10': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:
