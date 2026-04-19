@@ -90,11 +90,11 @@ export function AppShell() {
               <span className="hidden sm:inline">Run simulation</span>
               <span className="sm:hidden">Run</span>
             </Button>
-            <Button variant="outline" onClick={reset}>
+            <Button variant="outline" onClick={reset} aria-label="Reset simulation">
               <RotateCcw className="size-4" />
               <span className="hidden sm:inline">Reset</span>
             </Button>
-            <Button variant="outline" disabled={!run} onClick={() => setAnalysisOpen(true)}>
+            <Button variant="outline" disabled={!run} onClick={() => setAnalysisOpen(true)} aria-label="Open analysis">
               <BarChart3 className="size-4" />
               <span className="hidden sm:inline">Analysis</span>
             </Button>
