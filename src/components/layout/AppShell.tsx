@@ -55,6 +55,8 @@ export function AppShell() {
   const reset = useSimulationStore((state) => state.reset)
   const replayIndex = useSimulationStore((state) => state.replayIndex)
   const frame = run?.frames[replayIndex]
+  const badgeBase = "hidden rounded-sm md:inline-flex"
+  const statusBadgeClassName = frame && !frame.isStanding ? `${badgeBase} bg-red-500/90 text-white` : `${badgeBase} bg-teal-500/90 text-[#08110f]`
   useReplayClock()
 
   return (
@@ -68,8 +70,8 @@ export function AppShell() {
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold tracking-tight">BridgeLab</h1>
             </div>
-            <Badge variant="secondary" className="hidden rounded-sm md:inline-flex">{bridgeTypeLabels[config.bridge.type]}</Badge>
-            <Badge className={frame && !frame.isStanding ? "hidden rounded-sm bg-red-500/90 text-white md:inline-flex" : "hidden rounded-sm bg-teal-500/90 text-[#08110f] md:inline-flex"}>
+            <Badge variant="secondary" className={badgeBase}>{bridgeTypeLabels[config.bridge.type]}</Badge>
+            <Badge className={statusBadgeClassName}>
               {run ? (frame?.isStanding ? "standing" : "failed") : "ready"}
             </Badge>
           </div>

@@ -205,6 +205,8 @@ function CameraDirector({ config, frame }: { config: SimulationConfig; frame?: S
     const now = performance.now()
     if (now - lastSync.current > 80) {
       lastSync.current = now
+      camera.updateProjectionMatrix()
+      camera.updateMatrixWorld()
       const matrices: CameraMatrices = {
         projection: camera.projectionMatrix.elements.slice(),
         view: camera.matrixWorldInverse.elements.slice(),
@@ -213,7 +215,7 @@ function CameraDirector({ config, frame }: { config: SimulationConfig; frame?: S
       }
       setCameraMatrices(matrices)
     }
-  })
+  }, 1)
 
   return null
 }
