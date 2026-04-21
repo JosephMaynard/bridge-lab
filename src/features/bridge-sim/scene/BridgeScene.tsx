@@ -560,6 +560,47 @@ const renderLoadCentreFor = (config: SimulationConfig, time: number) => {
   return clamp(config.load.bias * 0.2, -0.35, 0.35)
 }
 
+const renderLoadPointsFor = (config: SimulationConfig, time: number) => {
+  const pointCount = Math.max(1, Math.round(config.load.loadPoints))
+  const centre = renderLoadCentreFor(config, time)
+  const laneOffset = pointCount > 1 ? clamp(config.bridge.deckWidth * 0.18, 0.54, 0.92) : 0
+  const convoySpacing = pointCount > 1 ? Math.min(0.14, 1.58 / (pointCount - 1)) : 0
+  const clusteredSpacing = pointCount > 1 ? Math.min(0.1, 0.86 / (pointCount - 1)) : 0
+  const spread = (pointCount - 1) * (config.load.movingLoad ? convoySpacing : clusteredSpacing)
+  const fittedCentre = clamp(centre, -0.82 + spread / 2, 0.82 - spread / 2)
+
+  if (!config.load.movingLoad && config.load.distribution === "even") {
+    return Array.from({ length: pointCount }, (_, index) => {
+      const normalized = pointCount === 1 ? 0 : index / (pointCount - 1)
+      return {
+        key: `load-even-${index}`,
+        centre: clamp(-0.76 + normalized * 1.52 + config.load.bias * 0.18, -0.86, 0.86),
+        lane: index % 2 === 0 ? -laneOffset : laneOffset,
+      }
+    })
+  }
+
+  if (!config.load.movingLoad && config.load.distribution === "random") {
+    return Array.from({ length: pointCount }, (_, index) => {
+      const seededPosition = perlinNoise1d(index * 8.13 + config.load.totalWeight * 0.07, 4.9)
+      return {
+        key: `load-random-${index}`,
+        centre: clamp(seededPosition * 0.55 + centre * 0.22, -0.86, 0.86),
+        lane: index % 2 === 0 ? -laneOffset : laneOffset,
+      }
+    }).sort((left, right) => left.centre - right.centre)
+  }
+
+  return Array.from({ length: pointCount }, (_, index) => {
+    const offset = (index - (pointCount - 1) / 2) * (config.load.movingLoad ? convoySpacing : clusteredSpacing)
+    return {
+      key: `load-${index}`,
+      centre: clamp(fittedCentre + offset, -0.86, 0.86),
+      lane: index % 2 === 0 ? -laneOffset : laneOffset,
+    }
+  })
+}
+
 function nodeAtNormalized(nodes: BridgeNodeFrame[], normalized: number) {
   const target = clamp(normalized, 0, 1) * (nodes.length - 1)
   const leftIndex = Math.floor(target)
@@ -577,38 +618,45 @@ function nodeAtNormalized(nodes: BridgeNodeFrame[], normalized: number) {
 function LoadTruck({ config, frame, failureProgress }: { config: SimulationConfig; frame: SimulationFrame; failureProgress: number }) {
   if (config.load.totalWeight <= 0) return null
 
-  const centre = renderLoadCentreFor(config, frame.time)
-  const position = nodeAtNormalized(frame.nodes, (centre + 1) / 2)
-  const weightScale = clamp(config.load.totalWeight / 110, 0.55, 1.35)
-  const length = 1.65 + weightScale * 1.08
+  const loadPoints = renderLoadPointsFor(config, frame.time)
+  const weightScale = clamp(config.load.totalWeight / Math.max(1, loadPoints.length) / 26, 0.48, 1.08)
+  const length = 1.35 + weightScale * 0.78
   const width = clamp(config.bridge.deckWidth * 0.28, 1.25, 1.95)
   const fall = failureProgress > 0 ? Math.pow(failureProgress, 1.4) : 0
-  const side = centre >= 0 ? 1 : -1
-  const truckY = position.y + 0.48 - fall * 7.4
-  const truckZ = position.z + side * fall * 2.2
 
   return (
-    <group position={[position.x + side * fall * 1.4, truckY, truckZ]} rotation={[fall * 1.25, 0, side * fall * 1.8]} scale={[1, 1, 1]}>
-      <mesh castShadow receiveShadow position={[0, 0.22, 0]}>
-        <boxGeometry args={[length, 0.48, width]} />
-        <meshStandardMaterial color="#d7cc78" roughness={0.44} metalness={0.18} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[length * 0.34, 0.64, 0]}>
-        <boxGeometry args={[0.78, 0.78, width * 0.86]} />
-        <meshStandardMaterial color="#7edfd0" roughness={0.38} metalness={0.24} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[-length * 0.22, 0.62, 0]}>
-        <boxGeometry args={[length * 0.68, 0.62, width * 0.92]} />
-        <meshStandardMaterial color="#d0d8c8" roughness={0.52} metalness={0.12} />
-      </mesh>
-      {[-1, 1].flatMap((zSide) =>
-        [-0.34, 0.28].map((xOffset) => (
-          <mesh key={`${zSide}-${xOffset}`} castShadow receiveShadow position={[xOffset * length, -0.08, zSide * width * 0.46]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.16, 0.16, 0.16, 14]} />
-            <meshStandardMaterial color="#101816" roughness={0.7} />
-          </mesh>
-        )),
-      )}
+    <group>
+      {loadPoints.map((loadPoint) => {
+        const position = nodeAtNormalized(frame.nodes, (loadPoint.centre + 1) / 2)
+        const side = loadPoint.centre >= 0 ? 1 : -1
+        const truckY = position.y + 0.48 - fall * 7.4
+        const truckZ = position.z + loadPoint.lane + side * fall * 2.2
+
+        return (
+          <group key={loadPoint.key} position={[position.x + side * fall * 1.4, truckY, truckZ]} rotation={[fall * 1.25, 0, side * fall * 1.8]}>
+            <mesh castShadow receiveShadow position={[0, 0.22, 0]}>
+              <boxGeometry args={[length, 0.48, width]} />
+              <meshStandardMaterial color="#e3262f" roughness={0.36} metalness={0.22} emissive="#4f0308" emissiveIntensity={0.14} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[length * 0.34, 0.64, 0]}>
+              <boxGeometry args={[0.68, 0.74, width * 0.84]} />
+              <meshStandardMaterial color="#ff3b45" roughness={0.32} metalness={0.24} emissive="#5b050a" emissiveIntensity={0.12} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[-length * 0.22, 0.62, 0]}>
+              <boxGeometry args={[length * 0.66, 0.58, width * 0.9]} />
+              <meshStandardMaterial color="#b91520" roughness={0.45} metalness={0.18} emissive="#450308" emissiveIntensity={0.1} />
+            </mesh>
+            {[-1, 1].flatMap((zSide) =>
+              [-0.34, 0.28].map((xOffset) => (
+                <mesh key={`${zSide}-${xOffset}`} castShadow receiveShadow position={[xOffset * length, -0.08, zSide * width * 0.46]} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.16, 0.16, 0.16, 14]} />
+                  <meshStandardMaterial color="#101816" roughness={0.7} />
+                </mesh>
+              )),
+            )}
+          </group>
+        )
+      })}
     </group>
   )
 }
