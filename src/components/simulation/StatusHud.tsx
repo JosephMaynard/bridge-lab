@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { Activity, AlertTriangle, ChevronRight, CircleGauge, Flame, PawPrint, Timer, Waves, Wind } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSimulationStore } from "@/store/simulation-store"
@@ -7,14 +7,17 @@ const format = (value: number | undefined, digits = 2) => value === undefined ? 
 const formatUnit = (value: number | undefined, unit: string, digits = 2) => value === undefined ? "n/a" : `${value.toFixed(digits)}${unit}`
 
 export function StatusHud() {
+  const panelId = useId()
   const [open, setOpen] = useState(false)
   const run = useSimulationStore((state) => state.currentRun)
   const replayIndex = useSimulationStore((state) => state.replayIndex)
   const frame = run?.frames[replayIndex]
-  const standing = run ? frame?.isStanding : undefined
-  const status = run ? (standing ? "Standing" : "Failed") : "Ready"
+  const standing = run && frame ? frame.isStanding : undefined
+  const status = !run ? "Ready" : !frame ? "Pending" : standing ? "Standing" : "Failed"
+  const statusTone = status === "Failed" ? "danger" : status === "Standing" || status === "Ready" ? "good" : undefined
+  const statusBadgeText = status === "Standing" ? "stable" : status === "Failed" ? "alert" : status === "Ready" ? "idle" : "pending"
   const metrics = [
-    { icon: <Activity className="size-4" />, label: "State", value: status, tone: standing === false ? "danger" : "good" },
+    { icon: <Activity className="size-4" />, label: "State", value: status, tone: statusTone },
     { icon: <CircleGauge className="size-4" />, label: "Max stress", value: format(frame?.maxStress) },
     { icon: <Waves className="size-4" />, label: "Centre sway", value: formatUnit(frame?.centreDisplacement, "m") },
     { icon: <Wind className="size-4" />, label: "Wind", value: formatUnit(frame?.windSpeed, "kt", 1) },
@@ -28,6 +31,7 @@ export function StatusHud() {
     <div className="pointer-events-none absolute right-3 top-4 z-40 flex max-w-[calc(100%-1.5rem)] items-start justify-end sm:right-4">
       <div className="pointer-events-auto flex items-start">
         <aside
+          id={panelId}
           aria-hidden={!open}
           className={cn(
             "overflow-hidden transition-[width,opacity] duration-200 ease-out",
@@ -40,8 +44,8 @@ export function StatusHud() {
                 <p className="text-[0.65rem] uppercase leading-none text-white/55">Live status</p>
                 <p className="mt-1 text-sm font-semibold leading-tight text-white">{status}</p>
               </div>
-              <span className={cn("rounded-sm px-2 py-1 text-[0.65rem] font-semibold uppercase", standing === false ? "bg-red-400/18 text-red-200" : "bg-teal-300/18 text-teal-200")}>
-                {run ? (standing ? "stable" : "alert") : "idle"}
+              <span className={cn("rounded-sm px-2 py-1 text-[0.65rem] font-semibold uppercase", status === "Failed" ? "bg-red-400/18 text-red-200" : "bg-teal-300/18 text-teal-200")}>
+                {statusBadgeText}
               </span>
             </div>
             <div className="grid grid-cols-1 gap-2">
@@ -53,6 +57,7 @@ export function StatusHud() {
         </aside>
         <button
           type="button"
+          aria-controls={panelId}
           aria-expanded={open}
           aria-label={open ? "Collapse status panel" : "Open status panel"}
           onClick={() => setOpen((current) => !current)}

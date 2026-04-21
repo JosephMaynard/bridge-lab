@@ -6,7 +6,8 @@ declare module "plotly.js-basic-dist-min" {
 
 declare module "react-plotly.js" {
   import type * as Plotly from "plotly.js"
-  import type { CSSProperties, PureComponent, ReactNode } from "react"
+  import { PureComponent } from "react"
+  import type { CSSProperties, ReactNode } from "react"
 
   export interface Figure {
     data: Plotly.Data[]
