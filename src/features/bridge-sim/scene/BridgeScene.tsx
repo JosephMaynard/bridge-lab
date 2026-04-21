@@ -1,8 +1,9 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { Environment, Line, OrbitControls, PerspectiveCamera, Sky, Stars, useAnimations, useGLTF } from "@react-three/drei"
-import { useEffect, useMemo, useRef } from "react"
+import { Environment, Line, OrbitControls, Sky, Stars, useAnimations, useGLTF } from "@react-three/drei"
+import { Suspense, useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import trexUrl from "@/assets/T-Rex.glb?url"
+import { createPreviewFrame } from "@/features/bridge-sim/engine"
 import { useSimulationStore } from "@/store/simulation-store"
 import type { BridgeNodeFrame, CameraMatrices, SimulationConfig, SimulationFrame, TimeOfDay } from "@/types/simulation"
 
@@ -215,7 +216,21 @@ function CameraDirector({ config, frame }: { config: SimulationConfig; frame?: S
       }
       setCameraMatrices(matrices)
     }
-  }, 1)
+  })
+
+  return null
+}
+
+function CameraHome({ cinematic }: { cinematic: boolean }) {
+  const { camera } = useThree()
+
+  useEffect(() => {
+    if (cinematic) return
+    camera.position.set(0, 10, 48)
+    camera.lookAt(0, 0, 0)
+    camera.updateProjectionMatrix()
+    camera.updateMatrixWorld()
+  }, [camera, cinematic])
 
   return null
 }
@@ -308,7 +323,9 @@ function Atmosphere({ config }: { config: SimulationConfig }) {
       <Landmass x={-27} />
       <Landmass x={27} mirrored />
       <BridgeLights spanLength={config.bridge.spanLength} enabled={preset.bridgeLights} />
-      <Environment preset={preset.environmentPreset} />
+      <Suspense fallback={null}>
+        <Environment preset={preset.environmentPreset} />
+      </Suspense>
     </>
   )
 }
@@ -839,7 +856,11 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
         return <SupportPier key={`support-${node.id}`} node={node} color={stressColor(frame.supportStress[index] ?? node.stress, threshold)} />
       })}
       <LoadTruck config={config} frame={frame} failureProgress={failureProgress} />
-      <DinosaurAttack config={config} frame={frame} />
+      {config.dinosaur.enabled && config.dinosaur.showEffects && (
+        <Suspense fallback={null}>
+          <DinosaurAttack config={config} frame={frame} />
+        </Suspense>
+      )}
       {frame.failureNodeIndex !== undefined && config.overlay.showFailureZones && !frame.isStanding && (
         <mesh position={[nodes[frame.failureNodeIndex].x, nodes[frame.failureNodeIndex].y + 1.1, nodes[frame.failureNodeIndex].z]}>
           <sphereGeometry args={[1.1, 24, 16]} />
@@ -851,45 +872,7 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
 }
 
 function IdleBridge({ config }: { config: SimulationConfig }) {
-  const nodes = useMemo<BridgeNodeFrame[]>(
-    () =>
-      Array.from({ length: 33 }, (_, index) => {
-        const normal = index / 32
-        return {
-          id: `idle-${index}`,
-          x: (normal - 0.5) * config.bridge.spanLength,
-          y: Math.sin(index * 0.4) * 0.03,
-          z: 0,
-          baseX: (normal - 0.5) * config.bridge.spanLength,
-          baseY: 0,
-          baseZ: 0,
-          stress: 0.22 + Math.sin(Math.PI * normal) * 0.2,
-          displacement: 0,
-          failed: false,
-        }
-      }),
-    [config.bridge.spanLength],
-  )
-  const frame: SimulationFrame = {
-    index: 0,
-    time: 0,
-    isStanding: true,
-    nodes,
-    segmentStress: nodes.slice(0, -1).map((node) => node.stress),
-    supportStress: Array.from({ length: config.bridge.supports }, () => 0.28),
-    maxStress: 0.42,
-    centreDisplacement: 0,
-    lateralSway: 0,
-    windSpeed: config.wind.enabled ? config.wind.speed : 0,
-    earthquakeForce: 0,
-    impactForce: 0,
-    impactX: config.impact.targetBias * config.bridge.spanLength * 0.48,
-    dinosaurForce: 0,
-    dinosaurX: config.dinosaur.targetBias * config.bridge.spanLength * 0.48,
-    dinosaurSide: config.dinosaur.side,
-    loadProfile: nodes.map(() => 0.12),
-    damage: 0,
-  }
+  const frame = useMemo(() => createPreviewFrame(config), [config])
 
   return <BridgeModel config={config} frame={frame} />
 }
@@ -1107,9 +1090,13 @@ function SceneContents() {
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 12, 48]} fov={42} near={0.1} far={220} />
-      <Atmosphere config={config} />
-      <BridgeModel config={config} frame={frame} />
+      <CameraHome cinematic={config.camera.cinematic} />
+      <Suspense fallback={null}>
+        <Atmosphere config={config} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <BridgeModel config={config} frame={frame} />
+      </Suspense>
       <WindParticles config={config} frame={frame} />
       <MeteorImpact config={config} frame={frame} />
       <CameraDirector config={config} frame={frame} />
@@ -1121,7 +1108,13 @@ function SceneContents() {
 export function BridgeScene({ className }: BridgeSceneProps) {
   return (
     <div className={className}>
-      <Canvas shadows="basic" dpr={[1, 2]} gl={{ antialias: true, alpha: true }} resize={{ scroll: false, debounce: { scroll: 50, resize: 0 } }}>
+      <Canvas
+        camera={{ position: [0, 10, 48], fov: 42, near: 0.1, far: 220 }}
+        shadows="basic"
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: true }}
+        resize={{ scroll: false, debounce: { scroll: 50, resize: 0 } }}
+      >
         <SceneContents />
       </Canvas>
     </div>

@@ -123,7 +123,7 @@ export function AppShell() {
             )}
             <ReplayBar />
             {frame?.failureTime !== undefined && !frame.isStanding && (
-              <div className="pointer-events-none absolute right-4 top-4 z-30 rounded-md border border-red-300/40 bg-red-950/60 px-4 py-3 text-sm text-red-50 shadow-2xl backdrop-blur-xl">
+              <div className="pointer-events-none absolute left-4 top-4 z-30 rounded-md border border-red-300/40 bg-red-950/60 px-4 py-3 text-sm text-red-50 shadow-2xl backdrop-blur-xl">
                 Collapse replay active. Stress overlay is frozen at the last intact frame.
               </div>
             )}

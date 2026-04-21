@@ -255,6 +255,56 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
   }
 }
 
+export const createPreviewFrame = (config: SimulationConfig): SimulationFrame => {
+  const nodes: BridgeNodeFrame[] = Array.from({ length: NODE_COUNT }, (_, index) => {
+    const normalized = index / (NODE_COUNT - 1)
+    const loadInfluence = loadAt(normalized, 0, config)
+    const windInfluence = config.wind.enabled ? config.wind.speed / 140 : 0
+    const shape = Math.sin(Math.PI * normalized)
+    const stress = 0.2 + loadInfluence * 0.44 + windInfluence * shape
+
+    return {
+      id: `preview-${index}`,
+      x: (normalized - 0.5) * config.bridge.spanLength,
+      y: shape * 0.04,
+      z: 0,
+      baseX: (normalized - 0.5) * config.bridge.spanLength,
+      baseY: 0,
+      baseZ: 0,
+      stress,
+      displacement: 0,
+      failed: false,
+    }
+  })
+  const segmentStress = nodes.slice(0, -1).map((node, index) => {
+    const next = nodes[index + 1] ?? node
+    return (node.stress + next.stress) / 2
+  })
+  const supportStress = supportStressFor(segmentStress, config.bridge.supports)
+  const maxStress = Math.max(...nodes.map((node) => node.stress), ...segmentStress)
+
+  return {
+    index: 0,
+    time: 0,
+    isStanding: true,
+    nodes,
+    segmentStress,
+    supportStress,
+    maxStress,
+    centreDisplacement: 0,
+    lateralSway: 0,
+    windSpeed: config.wind.enabled ? config.wind.speed : 0,
+    earthquakeForce: 0,
+    impactForce: 0,
+    impactX: config.impact.targetBias * config.bridge.spanLength * 0.48,
+    dinosaurForce: 0,
+    dinosaurX: config.dinosaur.targetBias * config.bridge.spanLength * 0.48,
+    dinosaurSide: config.dinosaur.side,
+    loadProfile: nodes.map((_, index) => loadAt(index / (NODE_COUNT - 1), 0, config)),
+    damage: 0,
+  }
+}
+
 export const getLastIntactFrame = (run: SimulationRun, frameIndex: number) => {
   if (!run.failed || run.failureTime === undefined) {
     return run.frames[frameIndex] ?? run.frames.at(-1)
