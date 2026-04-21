@@ -740,10 +740,33 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
       ] as [number, number, number],
     }
   }
-  const cableY = (node: BridgeNodeFrame) => {
-    const shape = Math.sin(Math.PI * ((node.baseX / config.bridge.spanLength) + 0.5))
-    return config.bridge.towerHeight + 0.4 - shape * config.bridge.towerHeight * config.bridge.cableSag
+  const towerCableY = config.bridge.towerHeight + 0.16
+  const anchorCableY = 0.92
+  const midCableY = towerCableY - config.bridge.towerHeight * clamp(config.bridge.cableSag, 0.18, 0.56)
+  const cableYAtX = (x: number) => {
+    if (x < -towerX) {
+      const progress = clamp((x + config.bridge.spanLength / 2) / (config.bridge.spanLength / 2 - towerX), 0, 1)
+      return THREE.MathUtils.lerp(anchorCableY, towerCableY, smoothStep(progress))
+    }
+
+    if (x > towerX) {
+      const progress = clamp((x - towerX) / (config.bridge.spanLength / 2 - towerX), 0, 1)
+      return THREE.MathUtils.lerp(towerCableY, anchorCableY, smoothStep(progress))
+    }
+
+    const progress = (x + towerX) / (towerX * 2)
+    return towerCableY - (towerCableY - midCableY) * Math.sin(Math.PI * progress)
   }
+  const cableXs = Array.from(
+    new Set([
+      -config.bridge.spanLength / 2,
+      -towerX,
+      ...Array.from({ length: 45 }, (_, index) => -config.bridge.spanLength / 2 + (index / 44) * config.bridge.spanLength),
+      towerX,
+      config.bridge.spanLength / 2,
+    ]),
+  ).sort((left, right) => left - right)
+  const hangerNodes = nodes.filter((node, index) => index % 2 === 0 && node.baseX > -towerX + 0.25 && node.baseX < towerX - 0.25)
 
   return (
     <group>
@@ -767,11 +790,11 @@ function BridgeModel({ config, frame }: { config: SimulationConfig; frame?: Simu
             const cableZ = side * (config.bridge.deckWidth / 2 + 0.2)
             return (
               <group key={`suspension-side-${side}`}>
-                <Line points={nodes.map((node) => [node.x, cableY(node), cableZ] as [number, number, number])} color="#f3e9bd" lineWidth={2.2} transparent opacity={fractureFade} />
-                {nodes.filter((_, index) => index % 2 === 0).map((node) => (
+                <Line points={cableXs.map((x) => [x, cableYAtX(x), cableZ] as [number, number, number])} color="#f3e9bd" lineWidth={2.2} transparent opacity={fractureFade} />
+                {hangerNodes.map((node) => (
                   <Line
                     key={`hanger-${side}-${node.id}`}
-                    points={[[node.x, node.y + 0.24, cableZ], [node.x, cableY(node), cableZ]]}
+                    points={[[node.x, node.y + 0.24, cableZ], [node.x, cableYAtX(node.baseX), cableZ]]}
                     color="#cfe0da"
                     lineWidth={0.78}
                     transparent
