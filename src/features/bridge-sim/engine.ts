@@ -48,6 +48,11 @@ const loadAt = (normalized: number, time: number, config: SimulationConfig) => {
   const points = Math.max(1, config.load.loadPoints)
   const centre = loadCentreFor(config.load.distribution, config.load.bias, time, config)
 
+  if (config.load.movingLoad) {
+    const contactWidth = clamp(0.11 + points * 0.012 + loadScale * 0.035, 0.14, 0.3)
+    return loadScale * bell(normalized * 2 - 1, centre, contactWidth) * (1.16 + points * 0.026)
+  }
+
   if (config.load.distribution === "even") {
     return loadScale * (0.52 + 0.48 * Math.sin(Math.PI * normalized))
   }
