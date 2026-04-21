@@ -48,6 +48,11 @@ const loadAt = (normalized: number, time: number, config: SimulationConfig) => {
   const points = Math.max(1, config.load.loadPoints)
   const centre = loadCentreFor(config.load.distribution, config.load.bias, time, config)
 
+  if (config.load.movingLoad) {
+    const contactWidth = clamp(0.11 + points * 0.012 + loadScale * 0.035, 0.14, 0.3)
+    return loadScale * bell(normalized * 2 - 1, centre, contactWidth) * (1.16 + points * 0.026)
+  }
+
   if (config.load.distribution === "even") {
     return loadScale * (0.52 + 0.48 * Math.sin(Math.PI * normalized))
   }
@@ -92,7 +97,12 @@ const dinosaurPulseFor = (time: number, config: SimulationConfig) => {
   const cycle = (attackAge * config.dinosaur.biteFrequency) % 1
   const bite = Math.exp(-Math.pow((cycle - 0.18) / 0.12, 2))
   const jawShake = Math.exp(-Math.pow((cycle - 0.38) / 0.18, 2)) * 0.25
-  return (bite + jawShake) * 0.62
+  return (bite + jawShake) * 0.92
+}
+
+const dinosaurBiteScaleFor = (intensity: number) => {
+  const normalized = clamp((intensity - 0.1) / 1.7, 0, 1)
+  return 0.76 + normalized * normalized * 1.1
 }
 
 export const runSimulation = (config: SimulationConfig): SimulationRun => {
@@ -129,7 +139,8 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     const impactEnergy = config.impact.enabled ? impactPulse * config.impact.intensity * (0.55 + config.impact.speed / 82) : 0
     const impactX = clamp(config.impact.targetBias, -0.9, 0.9) * span * 0.48
     const dinosaurPulse = dinosaurPulseFor(time, config)
-    const dinosaurEnergy = config.dinosaur.enabled ? dinosaurPulse * config.dinosaur.intensity : 0
+    const dinosaurBiteScale = dinosaurBiteScaleFor(config.dinosaur.intensity)
+    const dinosaurEnergy = config.dinosaur.enabled ? dinosaurPulse * config.dinosaur.intensity * dinosaurBiteScale : 0
     const dinosaurX = clamp(config.dinosaur.targetBias, -0.9, 0.9) * span * 0.48
     const dinosaurSideDirection = config.dinosaur.side === "near" ? -1 : 1
     const dinosaurHitDirection = -dinosaurSideDirection
@@ -149,7 +160,7 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
       const torsion = Math.sin(time * 2.3 + index * 0.62)
       const loadInfluence = loadProfile[index] ?? 0
       const impactInfluence = bell(normalized * 2 - 1, clamp(config.impact.targetBias, -0.9, 0.9), Math.max(0.09, config.impact.radius))
-      const dinosaurInfluence = bell(normalized * 2 - 1, clamp(config.dinosaur.targetBias, -0.9, 0.9), 0.22)
+      const dinosaurInfluence = bell(normalized * 2 - 1, clamp(config.dinosaur.targetBias, -0.9, 0.9), 0.28)
       const verticalDirection = config.earthquake.direction === "lateral" ? 0.35 : 1
       const lateralDirection = config.earthquake.direction === "vertical" ? 0.35 : 1
       const verticalDeflection = -shape * (loadInfluence * 1.7 + (windSpeed / 60) * 0.42) / stiffness
@@ -158,8 +169,8 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
       const quakeLateral = earthquakeForce * lateralDirection * edgeRelief * 1.45 / damping
       const impactVertical = -impactEnergy * impactInfluence * (2.1 + config.impact.radius * 2.8) / stiffness
       const impactLateral = impactEnergy * impactInfluence * Math.sin((config.impact.angle * Math.PI) / 180) * 1.8 / damping
-      const dinosaurVertical = -dinosaurEnergy * dinosaurInfluence * 0.52 / stiffness
-      const dinosaurLateral = dinosaurHitDirection * dinosaurEnergy * dinosaurInfluence * 1.45 / damping
+      const dinosaurVertical = -dinosaurEnergy * dinosaurInfluence * 0.86 / stiffness
+      const dinosaurLateral = dinosaurHitDirection * dinosaurEnergy * dinosaurInfluence * 2.2 / damping
       const oscillation = modal * shape * (0.18 + windSpeed / 260) / damping
       const collapsePull = failureProgress > 0 ? Math.pow(failureProgress, 1.45) * (1.2 + shape * 7.8) : 0
       const snapSide = failureProgress > 0 && failureNodeIndex !== undefined ? Math.sign(index - failureNodeIndex || 1) : 1
@@ -174,7 +185,7 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
           windSpeed / 118 +
           Math.abs(earthquakeForce) * 0.72 +
           impactEnergy * impactInfluence * 1.38 +
-          dinosaurEnergy * dinosaurInfluence * 0.58 +
+          dinosaurEnergy * dinosaurInfluence * 1.18 +
           Math.abs(windSway) * 0.18 +
           Math.abs(verticalDeflection) * 0.22)
       const distance = Math.sqrt(Math.pow(x - node.baseX, 2) + Math.pow(y - node.baseY, 2) + Math.pow(z - node.baseZ, 2))
@@ -196,7 +207,7 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     }
 
     const maxStress = Math.max(...nodes.map((node) => node.stress), ...segmentStress)
-    accumulatedDamage = clamp(accumulatedDamage + Math.max(0, maxStress - threshold * 0.86) * dt * 0.13 + impactEnergy * dt * 0.16 + dinosaurEnergy * dt * 0.04, 0, 1)
+    accumulatedDamage = clamp(accumulatedDamage + Math.max(0, maxStress - threshold * 0.86) * dt * 0.13 + impactEnergy * dt * 0.16 + dinosaurEnergy * dt * 0.16, 0, 1)
 
     const beforeMeteorStrike = config.impact.enabled && time < config.impact.impactTime
     const beforeDinosaurAttack = config.dinosaur.enabled && time < config.dinosaur.attackTime
@@ -252,6 +263,56 @@ export const runSimulation = (config: SimulationConfig): SimulationRun => {
     peakStress,
     peakDisplacement,
     peakSway,
+  }
+}
+
+export const createPreviewFrame = (config: SimulationConfig): SimulationFrame => {
+  const nodes: BridgeNodeFrame[] = Array.from({ length: NODE_COUNT }, (_, index) => {
+    const normalized = index / (NODE_COUNT - 1)
+    const loadInfluence = loadAt(normalized, 0, config)
+    const windInfluence = config.wind.enabled ? config.wind.speed / 140 : 0
+    const shape = Math.sin(Math.PI * normalized)
+    const stress = 0.2 + loadInfluence * 0.44 + windInfluence * shape
+
+    return {
+      id: `preview-${index}`,
+      x: (normalized - 0.5) * config.bridge.spanLength,
+      y: shape * 0.04,
+      z: 0,
+      baseX: (normalized - 0.5) * config.bridge.spanLength,
+      baseY: 0,
+      baseZ: 0,
+      stress,
+      displacement: 0,
+      failed: false,
+    }
+  })
+  const segmentStress = nodes.slice(0, -1).map((node, index) => {
+    const next = nodes[index + 1] ?? node
+    return (node.stress + next.stress) / 2
+  })
+  const supportStress = supportStressFor(segmentStress, config.bridge.supports)
+  const maxStress = Math.max(...nodes.map((node) => node.stress), ...segmentStress)
+
+  return {
+    index: 0,
+    time: 0,
+    isStanding: true,
+    nodes,
+    segmentStress,
+    supportStress,
+    maxStress,
+    centreDisplacement: 0,
+    lateralSway: 0,
+    windSpeed: config.wind.enabled ? config.wind.speed : 0,
+    earthquakeForce: 0,
+    impactForce: 0,
+    impactX: config.impact.targetBias * config.bridge.spanLength * 0.48,
+    dinosaurForce: 0,
+    dinosaurX: config.dinosaur.targetBias * config.bridge.spanLength * 0.48,
+    dinosaurSide: config.dinosaur.side,
+    loadProfile: nodes.map((_, index) => loadAt(index / (NODE_COUNT - 1), 0, config)),
+    damage: 0,
   }
 }
 
