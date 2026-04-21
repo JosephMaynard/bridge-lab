@@ -640,8 +640,15 @@ function LoadTruck({ config, frame, failureProgress }: { config: SimulationConfi
             </mesh>
             <mesh castShadow receiveShadow position={[length * 0.34, 0.64, 0]}>
               <boxGeometry args={[0.68, 0.74, width * 0.84]} />
-              <meshStandardMaterial color="#ff3b45" roughness={0.32} metalness={0.24} emissive="#5b050a" emissiveIntensity={0.12} />
+              <meshStandardMaterial color="#f6f3e8" roughness={0.34} metalness={0.18} emissive="#fff7d7" emissiveIntensity={0.08} />
             </mesh>
+            {[-1, 1].map((zSide) => (
+              <mesh key={`headlight-${zSide}`} position={[length * 0.68, 0.44, zSide * width * 0.28]}>
+                <boxGeometry args={[0.012, 0.13, 0.18]} />
+                <meshBasicMaterial color="#fff3a5" toneMapped={false} />
+              </mesh>
+            ))}
+            <pointLight position={[length * 0.72, 0.5, 0]} color="#fff3a5" intensity={0.45} distance={2.8} decay={2} />
             <mesh castShadow receiveShadow position={[-length * 0.22, 0.62, 0]}>
               <boxGeometry args={[length * 0.66, 0.58, width * 0.9]} />
               <meshStandardMaterial color="#b91520" roughness={0.45} metalness={0.18} emissive="#450308" emissiveIntensity={0.1} />
