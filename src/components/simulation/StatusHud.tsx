@@ -14,6 +14,7 @@ export function StatusHud() {
   const frame = run?.frames[replayIndex]
   const standing = run && frame ? frame.isStanding : undefined
   const status = !run ? "Ready" : !frame ? "Pending" : standing ? "Standing" : "Failed"
+  const collapseReplayActive = frame?.failureTime !== undefined && !frame.isStanding
   const statusTone = status === "Failed" ? "danger" : status === "Standing" || status === "Ready" ? "good" : undefined
   const statusBadgeText = status === "Standing" ? "stable" : status === "Failed" ? "alert" : status === "Ready" ? "idle" : "pending"
   const metrics = [
@@ -48,6 +49,17 @@ export function StatusHud() {
                 {statusBadgeText}
               </span>
             </div>
+            {collapseReplayActive && (
+              <div className="mb-3 rounded-sm border border-red-300/30 bg-red-500/12 px-3 py-2 text-red-50">
+                <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-red-200">
+                  <AlertTriangle className="size-3.5" />
+                  VTK overlay frozen
+                </div>
+                <p className="text-xs leading-snug text-red-50/82">
+                  Collapse replay active. Stress overlay is frozen at the last intact frame.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-2">
               {metrics.map((metric) => (
                 <Metric key={metric.label} {...metric} />

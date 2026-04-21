@@ -156,13 +156,12 @@ export function StressOverlay() {
       })
     }
 
-    context.globalAlpha = 0.88
-    context.fillStyle = run.failed && !run.frames[replayIndex]?.isStanding ? "rgba(255, 55, 90, 0.9)" : "rgba(197, 255, 238, 0.86)"
-    context.font = "12px Geist Variable, sans-serif"
-    const message = run.failed && !run.frames[replayIndex]?.isStanding
-      ? "VTK overlay frozen at last intact frame"
-      : `VTK scalar range ${scalarRange[0].toFixed(2)}-${scalarRange[1].toFixed(2)}`
-    context.fillText(message, 18, 28)
+    if (!run.failed || run.frames[replayIndex]?.isStanding) {
+      context.globalAlpha = 0.88
+      context.fillStyle = "rgba(197, 255, 238, 0.86)"
+      context.font = "12px Geist Variable, sans-serif"
+      context.fillText(`VTK scalar range ${scalarRange[0].toFixed(2)}-${scalarRange[1].toFixed(2)}`, 18, 28)
+    }
     context.restore()
   }, [cameraMatrices, config, frame, highlightTick, replayIndex, run, vtkDataset])
 

@@ -122,11 +122,6 @@ export function AppShell() {
               </div>
             )}
             <ReplayBar />
-            {frame?.failureTime !== undefined && !frame.isStanding && (
-              <div className="pointer-events-none absolute left-4 top-14 z-30 rounded-md border border-red-300/40 bg-red-950/60 px-4 py-3 text-sm text-red-50 shadow-2xl backdrop-blur-xl">
-                Collapse replay active. Stress overlay is frozen at the last intact frame.
-              </div>
-            )}
           </section>
         </main>
         <AnalysisModal open={analysisOpen} onOpenChange={setAnalysisOpen} />
